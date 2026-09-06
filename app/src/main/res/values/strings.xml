@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">AI Audiobook Generator</string>
+    <string name="dashboard_title">Audiobook Generator</string>
+    <string name="book_title_label">Book Title</string>
+    <string name="author_name_label">Author Name</string>
+    <string name="book_text_label">Book Content / Manuscript</string>
+    <string name="upload_text_file">Upload Text File (.txt/.epub/.md)</string>
+    <string name="load_sample_book">Load Sample (Public Domain)</string>
+    <string name="rights_confirmation">I confirm I own the rights or have permission / public domain license to use this text</string>
+    <string name="voice_selector_label">Voice Narration Style</string>
+    <string name="generate_audiobook">Generate AI Audiobook</string>
+    <string name="clean_and_organize">Clean &amp; Split Chapters with Gemini</string>
+    <string name="synthesize_audio">Synthesize Audio with cvoice.ai</string>
+    <string name="combine_audio">Combine Complete Audiobook</string>
+    <string name="download_audiobook">Download Full Audiobook</string>
+    <string name="preview_chapter">Preview Chapter</string>
+    <string name="settings_title">API &amp; Voice Settings</string>
+</resources>
+

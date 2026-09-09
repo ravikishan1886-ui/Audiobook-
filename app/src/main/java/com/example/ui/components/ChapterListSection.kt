@@ -242,7 +242,7 @@ fun ChapterItemCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
                             .background(
                                 if (isReady) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
@@ -369,31 +369,31 @@ fun ChapterItemCard(
                 }
 
                 // Right: Audio Actions
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isReady) {
                         FilledTonalIconButton(
                             onClick = onPreviewClick,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(40.dp)
                                 .testTag("preview_chapter_${chapter.id}")
                         ) {
                             Icon(
                                 imageVector = if (isCurrentlyPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 contentDescription = "Preview chapter",
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
                         IconButton(
                             onClick = onDownloadClick,
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(40.dp)
                                 .testTag("download_chapter_${chapter.id}")
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Download,
                                 contentDescription = "Download chapter",
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -402,11 +402,11 @@ fun ChapterItemCard(
                             onClick = onSynthesizeClick,
                             enabled = !isSynthesizing,
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.testTag("synthesize_chapter_${chapter.id}")
                         ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text("Synthesize", style = MaterialTheme.typography.labelSmall)
                         }
                     }

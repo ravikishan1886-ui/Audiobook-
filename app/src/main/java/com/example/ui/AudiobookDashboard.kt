@@ -19,11 +19,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.RemixViewMode
 import com.example.data.model.YouTubePrivacy
 import com.example.ui.components.*
 import kotlinx.coroutines.launch
@@ -35,7 +39,40 @@ fun AudiobookDashboard(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val remixState by viewModel.remixState.collectAsStateWithLifecycle()
     val playerState by viewModel.playerManager.playerState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    // FULLSCREEN DISPLAY (When in preview mode)
+    if (remixState.currentView == RemixViewMode.PREVIEW) {
+        VideoRemixFullscreenPreview(
+            remixState = remixState,
+            onEditClick = { viewModel.backToRemixEdit() },
+            onProcessVideoClick = { viewModel.startVideoProcessing() },
+            onPrivacyChange = { viewModel.setRemixPrivacy(it) }
+        )
+        return
+    }
+
+    // 5. PROCESSING SCREEN (When processing video)
+    if (remixState.currentView == RemixViewMode.PROCESSING) {
+        VideoRemixProcessingScreen(
+            remixState = remixState,
+            onBackToEdit = { viewModel.backToRemixEdit() },
+            onSaveToGallery = { viewModel.saveRemixedVideoToGallery() },
+            onShareVideo = { viewModel.shareRemixedVideo() },
+            onWatchYouTube = { url ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
+            },
+            onRetry = { viewModel.startVideoProcessing() },
+            onProcessAnother = { viewModel.resetRemixState() }
+        )
+        return
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -55,59 +92,119 @@ fun AudiobookDashboard(
             .testTag("audiobook_dashboard_scaffold"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
+            Column {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (selectedTab == 0) Icons.Filled.Audiotrack else Icons.Filled.Movie,
+                                    contentDescription = "Logo",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = if (selectedTab == 0) "AI Audiobook Studio" else "Video & Music Remixer",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (selectedTab == 0) "Gemini AI & cvoice.ai Engine" else "Hardware Muxer & YouTube Upload",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { viewModel.openSettings(true) },
+                            modifier = Modifier.testTag("open_settings_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Audiotrack,
-                                contentDescription = "Logo",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(22.dp)
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        Column {
-                            Text(
-                                text = "AI Audiobook Studio",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Gemini AI & cvoice.ai Full-Stack Engine",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.openSettings(true) },
-                        modifier = Modifier.testTag("open_settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
+
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("main_navigation_tab_row")
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("AI Audiobook", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        },
+                        modifier = Modifier.testTag("tab_audiobook")
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Video Remixer", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        },
+                        modifier = Modifier.testTag("tab_remixer")
+                    )
+                }
+            }
         }
     ) { innerPadding ->
+        if (selectedTab == 1) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                VideoRemixInputSection(
+                    remixState = remixState,
+                    onVideoUrlChange = { viewModel.updateRemixVideoUrl(it) },
+                    onMusicSelected = { uri, name -> viewModel.selectRemixMusic(uri, name) },
+                    onSampleVideoSelected = { viewModel.selectSampleVideo(it) },
+                    onSampleMusicSelected = { viewModel.selectSampleMusic(it) },
+                    onRightsConfirmedChange = { viewModel.setRemixRightsConfirmed(it) },
+                    onNextToPreview = { viewModel.openFullscreenPreview() }
+                )
+            }
+        } else {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -182,7 +279,7 @@ fun AudiobookDashboard(
                             }
 
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Button(
@@ -192,22 +289,22 @@ fun AudiobookDashboard(
                                         contentColor = MaterialTheme.colorScheme.onError
                                     ),
                                     shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     modifier = Modifier.testTag("fix_api_key_button")
                                 ) {
-                                    Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Settings & Test", style = MaterialTheme.typography.labelSmall)
                                 }
                                 IconButton(
                                     onClick = { viewModel.dismissCvoiceError() },
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Close,
                                         contentDescription = "Dismiss",
                                         tint = MaterialTheme.colorScheme.onErrorContainer,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -279,40 +376,6 @@ fun AudiobookDashboard(
                                 text = uiState.progress.detailMessage,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-
-                if (uiState.chapters.isNotEmpty() && !isWideScreen) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SuggestionChip(
-                            onClick = {
-                                coroutineScope.launch { scrollState.animateScrollTo(0) }
-                            },
-                            label = { Text("Manuscript", style = MaterialTheme.typography.labelSmall) },
-                            icon = { Icon(Icons.Filled.ArrowUpward, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-                        SuggestionChip(
-                            onClick = {
-                                coroutineScope.launch { scrollState.animateScrollTo(600) }
-                            },
-                            label = { Text("Chapters (${uiState.chapters.size})", style = MaterialTheme.typography.labelSmall) },
-                            icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-                        if (uiState.fullAudiobookFile != null || playerState.currentChapterId != null) {
-                            SuggestionChip(
-                                onClick = {
-                                    coroutineScope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
-                                },
-                                label = { Text("Player & Export", style = MaterialTheme.typography.labelSmall) },
-                                icon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             )
                         }
                     }
@@ -463,6 +526,7 @@ fun AudiobookDashboard(
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
+        }
         }
     }
 

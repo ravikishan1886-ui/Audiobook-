@@ -98,27 +98,31 @@ fun AudioPlayerBar(
 
                 // Download Full Audiobook Button
                 if (fullAudiobookFile != null && fullAudiobookFile.exists()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         FilledTonalButton(
                             onClick = onDownloadFullAudiobook,
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             modifier = Modifier.testTag("download_full_audiobook_button")
                         ) {
-                            Icon(imageVector = Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(imageVector = Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text("Download Master", style = MaterialTheme.typography.labelMedium)
                         }
 
                         IconButton(
                             onClick = onShareAudiobook,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(40.dp)
                                 .testTag("share_audiobook_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Share,
                                 contentDescription = "Share",
+                                modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -206,11 +210,12 @@ fun AudioPlayerBar(
                             val newPos = (playerState.currentPositionMs - 10000L).coerceAtLeast(0L)
                             onSeek(newPos)
                         },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(42.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Replay10,
                             contentDescription = "Rewind 10s",
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -229,13 +234,13 @@ fun AudioPlayerBar(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(52.dp)
                             .testTag("player_play_pause_button")
                     ) {
                         Icon(
                             imageVector = if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (playerState.isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
 
@@ -245,11 +250,12 @@ fun AudioPlayerBar(
                             val newPos = (playerState.currentPositionMs + 10000L).coerceAtMost(playerState.totalDurationMs)
                             onSeek(newPos)
                         },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(42.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Forward10,
                             contentDescription = "Forward 10s",
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }

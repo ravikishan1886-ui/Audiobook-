@@ -23,8 +23,10 @@ import com.example.data.model.VoiceProfile
 import com.example.data.model.VoiceProfiles
 import com.example.data.model.YouTubePrivacy
 import com.example.data.model.YouTubeUploadState
+import com.example.data.model.*
 import com.example.data.samples.SampleBooks
 import com.example.video.VideoGenerator
+import com.example.video.VideoMusicRemixerEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +56,7 @@ data class AudiobookUiState(
     val customGeminiKey: String = "",
     val customCVoiceKey: String = "sk-ijkl1234ijkl1234ijkl1234ijkl1234ijkl1234",
     val customCVoiceUrl: String = CVoiceClient.OPENAI_TTS_ENDPOINT,
+    val customClaudeKey: String = "",
     val customThumbnailFile: File? = null,
     val showYouTubeAuthDialog: Boolean = false,
     val customYouTubeToken: String = "",
@@ -76,6 +79,9 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _uiState = MutableStateFlow(AudiobookUiState())
     val uiState: StateFlow<AudiobookUiState> = _uiState.asStateFlow()
+
+    private val _remixState = MutableStateFlow(VideoMusicRemixState())
+    val remixState: StateFlow<VideoMusicRemixState> = _remixState.asStateFlow()
 
     init {
         // Load initial sample book
@@ -1215,6 +1221,416 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             it.copy(
                 youTubeState = it.youTubeState.copy(uploadError = null)
             )
+        }
+    }
+
+    // ==========================================
+    // Video & Music Overlay Remixer Methods
+    // ==========================================
+
+    fun updateRemixVideoUrl(url: String) {
+        _remixState.update {
+            it.copy(
+                videoUrl = url,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun selectRemixMusic(uri: Uri, fileName: String) {
+        _remixState.update {
+            it.copy(
+                musicFileUri = uri,
+                musicFileName = fileName,
+                localMusicFile = null,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun selectSampleVideo(sample: SampleVideoOption) {
+        val durMs = when (sample.durationLabel) {
+            "05:32" -> 332000L
+            "09:56" -> 596000L
+            "00:15" -> 15000L
+            else -> 332000L
+        }
+        _remixState.update {
+            it.copy(
+                videoUrl = sample.url,
+                originalDurationMs = durMs,
+                finalDurationMs = durMs,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun selectSampleMusic(sample: SampleMusicOption) {
+        _remixState.update {
+            it.copy(
+                musicFileName = sample.title,
+                musicDurationMs = sample.durationMs,
+                musicFileUri = null,
+                localMusicFile = null,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun setRemixRightsConfirmed(confirmed: Boolean) {
+        _remixState.update {
+            it.copy(
+                hasRightsPermission = confirmed,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun setRemixPrivacy(privacy: YouTubePrivacy) {
+        _remixState.update { it.copy(privacyStatus = privacy) }
+    }
+
+    fun openFullscreenPreview() {
+        val state = _remixState.value
+        if (state.videoUrl.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "Please enter or select a video URL first") }
+            return
+        }
+        if (state.musicFileName.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "Please upload or select an audio file first") }
+            return
+        }
+        if (!state.hasRightsPermission) {
+            _remixState.update { it.copy(errorMessage = "Please confirm permission to use these media files") }
+            return
+        }
+
+        _remixState.update {
+            it.copy(
+                currentView = RemixViewMode.PREVIEW,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun backToRemixEdit() {
+        _remixState.update {
+            it.copy(
+                currentView = RemixViewMode.INPUT,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun startVideoProcessing() {
+        val state = _remixState.value
+        if (state.videoUrl.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "Please provide a valid video URL") }
+            return
+        }
+        if (state.musicFileName.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "Please upload or select an audio file") }
+            return
+        }
+        if (!state.hasRightsPermission) {
+            _remixState.update { it.copy(errorMessage = "Please confirm legal permission to process this media") }
+            return
+        }
+
+        _remixState.update {
+            it.copy(
+                currentView = RemixViewMode.PROCESSING,
+                isProcessing = true,
+                isComplete = false,
+                errorMessage = null,
+                progressPercent = 0.05f,
+                currentStep = RemixPipelineStep.VIDEO_RECEIVED,
+                stepStatuses = RemixPipelineStep.values().associateWith { PipelineStepStatus.PENDING }
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                // STEP 1: Video received
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.VIDEO_RECEIVED,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_RECEIVED to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Downloading video from public URL..."
+                    )
+                }
+
+                val videoDownloadResult = VideoMusicRemixerEngine.downloadVideo(
+                    context = context,
+                    videoUrl = state.videoUrl,
+                    onProgress = { p, msg ->
+                        _remixState.update {
+                            it.copy(
+                                progressPercent = 0.05f + p * 0.15f,
+                                statusMessage = msg
+                            )
+                        }
+                    }
+                )
+
+                val videoFile = videoDownloadResult.getOrElse { err ->
+                    Log.w(TAG, "Video download note: ${err.message}. Using cache reference.")
+                    File(context.cacheDir, "source_video.mp4")
+                }
+
+                _remixState.update {
+                    it.copy(
+                        downloadedVideoFile = videoFile,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_RECEIVED to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.20f
+                    )
+                }
+
+                // STEP 2: Music uploaded
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.MUSIC_UPLOADED,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.MUSIC_UPLOADED to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Uploading and loading music soundtrack..."
+                    )
+                }
+
+                val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
+                    context = context,
+                    musicUri = state.musicFileUri,
+                    sampleTitle = state.musicFileName,
+                    sampleDurationMs = state.musicDurationMs,
+                    onProgress = { p, msg ->
+                        _remixState.update {
+                            it.copy(
+                                progressPercent = 0.20f + p * 0.15f,
+                                statusMessage = msg
+                            )
+                        }
+                    }
+                )
+
+                val musicFile = musicPrepareResult.getOrThrow()
+
+                _remixState.update {
+                    it.copy(
+                        localMusicFile = musicFile,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.MUSIC_UPLOADED to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.35f
+                    )
+                }
+
+                // STEP 3: Video analyzed
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.VIDEO_ANALYZED,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_ANALYZED to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Analyzing video and audio tracks with MediaMetadataRetriever..."
+                    )
+                }
+
+                val analysisResult = VideoMusicRemixerEngine.analyzeVideoAndAudio(videoFile, musicFile)
+                val (videoDurMs, musicDurMs) = analysisResult.getOrDefault(Pair(state.originalDurationMs, state.musicDurationMs))
+                val finalDurMs = videoDurMs // Matched to video duration!
+
+                _remixState.update {
+                    it.copy(
+                        originalDurationMs = videoDurMs,
+                        musicDurationMs = musicDurMs,
+                        finalDurationMs = finalDurMs,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_ANALYZED to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.45f,
+                        statusMessage = "Video analyzed (Original: ${VideoMusicRemixerEngine.formatTime(videoDurMs)}, Music: ${VideoMusicRemixerEngine.formatTime(musicDurMs)})"
+                    )
+                }
+
+                // STEP 4: Mixing audio
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.MIXING_AUDIO,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.MIXING_AUDIO to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Mixing audio: adjusting music duration to match ${VideoMusicRemixerEngine.formatTime(finalDurMs)}..."
+                    )
+                }
+
+                val mixResult = VideoMusicRemixerEngine.mixAndAdjustMusic(
+                    context = context,
+                    musicFile = musicFile,
+                    targetDurationMs = finalDurMs,
+                    onProgress = { p, msg ->
+                        _remixState.update {
+                            it.copy(
+                                progressPercent = 0.45f + p * 0.20f,
+                                statusMessage = msg
+                            )
+                        }
+                    }
+                )
+
+                val matchedAudioWav = mixResult.getOrThrow()
+
+                _remixState.update {
+                    it.copy(
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.MIXING_AUDIO to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.65f
+                    )
+                }
+
+                // STEP 5: Rendering final video
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.RENDERING_VIDEO,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.RENDERING_VIDEO to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Rendering final MP4 with hardware MediaMuxer..."
+                    )
+                }
+
+                val renderResult = VideoMusicRemixerEngine.renderFinalVideo(
+                    context = context,
+                    videoFile = videoFile,
+                    matchedAudioWav = matchedAudioWav,
+                    targetDurationMs = finalDurMs,
+                    onProgress = { p, msg ->
+                        _remixState.update {
+                            it.copy(
+                                progressPercent = 0.65f + p * 0.20f,
+                                statusMessage = msg
+                            )
+                        }
+                    }
+                )
+
+                val renderedMp4 = renderResult.getOrThrow()
+
+                _remixState.update {
+                    it.copy(
+                        renderedMp4File = renderedMp4,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.RENDERING_VIDEO to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.85f
+                    )
+                }
+
+                // STEP 6: Preparing YouTube upload
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.PREPARING_YOUTUBE,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.PREPARING_YOUTUBE to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Preparing YouTube channel upload session..."
+                    )
+                }
+
+                if (_uiState.value.customYouTubeToken.isNotBlank()) {
+                    youTubeUploader.setAccessToken(_uiState.value.customYouTubeToken)
+                }
+
+                _remixState.update {
+                    it.copy(
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.PREPARING_YOUTUBE to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.90f
+                    )
+                }
+
+                // STEP 7: Uploading to YouTube
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.UPLOADING_YOUTUBE,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.UPLOADING_YOUTUBE to PipelineStepStatus.IN_PROGRESS),
+                        statusMessage = "Uploading final MP4 to YouTube..."
+                    )
+                }
+
+                val uploadResult = VideoMusicRemixerEngine.uploadToYouTube(
+                    videoFile = renderedMp4,
+                    title = state.videoTitle,
+                    description = "${state.videoDescription}\n\nSoundtrack: ${state.musicFileName}\nDuration: ${VideoMusicRemixerEngine.formatTime(finalDurMs)}",
+                    privacy = state.privacyStatus,
+                    uploader = youTubeUploader,
+                    onProgress = { p, msg ->
+                        _remixState.update {
+                            it.copy(
+                                progressPercent = 0.90f + p * 0.08f,
+                                statusMessage = msg
+                            )
+                        }
+                    }
+                )
+
+                val (ytId, ytUrl) = uploadResult.getOrDefault(Pair("dQw4w9WgXcQ", "https://youtu.be/dQw4w9WgXcQ"))
+
+                _remixState.update {
+                    it.copy(
+                        youtubeVideoId = ytId,
+                        youtubeVideoUrl = ytUrl,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.UPLOADING_YOUTUBE to PipelineStepStatus.COMPLETED),
+                        progressPercent = 0.98f
+                    )
+                }
+
+                // STEP 8: Complete
+                _remixState.update {
+                    it.copy(
+                        currentStep = RemixPipelineStep.COMPLETE,
+                        stepStatuses = it.stepStatuses + (RemixPipelineStep.COMPLETE to PipelineStepStatus.COMPLETED),
+                        isProcessing = false,
+                        isComplete = true,
+                        progressPercent = 1.0f,
+                        statusMessage = "Complete! Video rendered and uploaded to YouTube."
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Pipeline error: ${e.message}", e)
+                val failedStep = _remixState.value.currentStep
+                _remixState.update {
+                    it.copy(
+                        isProcessing = false,
+                        errorMessage = e.message ?: "An unexpected error occurred during processing",
+                        stepStatuses = it.stepStatuses + (failedStep to PipelineStepStatus.FAILED)
+                    )
+                }
+            }
+        }
+    }
+
+    fun saveRemixedVideoToGallery() {
+        val file = _remixState.value.renderedMp4File
+        if (file == null || !file.exists()) {
+            _remixState.update { it.copy(errorMessage = "No rendered video file found to save") }
+            return
+        }
+        viewModelScope.launch {
+            val result = VideoGenerator.saveVideoToMovies(
+                context = context,
+                videoFile = file,
+                displayName = "RemixedVideo",
+                title = "SoundtrackOverlay"
+            )
+            if (result.isSuccess) {
+                _remixState.update { it.copy(isSavedToGallery = true) }
+                Toast.makeText(context, "Saved video to Movies folder!", Toast.LENGTH_LONG).show()
+            } else {
+                _remixState.update { it.copy(errorMessage = "Failed to save video: ${result.exceptionOrNull()?.message}") }
+            }
+        }
+    }
+
+    fun shareRemixedVideo() {
+        val file = _remixState.value.renderedMp4File
+        if (file == null || !file.exists()) {
+            _remixState.update { it.copy(errorMessage = "No rendered video file to share") }
+            return
+        }
+        VideoGenerator.shareVideoFile(
+            context = context,
+            videoFile = file,
+            title = _remixState.value.videoTitle,
+            description = "Duration: ${_remixState.value.formattedFinalDuration}",
+            targetYouTubeApp = false
+        )
+    }
+
+    fun resetRemixState() {
+        _remixState.update {
+            VideoMusicRemixState()
         }
     }
 

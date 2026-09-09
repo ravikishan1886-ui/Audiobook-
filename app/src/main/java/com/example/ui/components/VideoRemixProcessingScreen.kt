@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -69,11 +70,13 @@ fun VideoRemixProcessingScreen(
                 ) {
                     IconButton(
                         onClick = onBackToEdit,
-                        enabled = !remixState.isProcessing || remixState.isComplete
+                        enabled = !remixState.isProcessing || remixState.isComplete,
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back to Edit"
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Edit",
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Column {
@@ -94,8 +97,8 @@ fun VideoRemixProcessingScreen(
 
                 if (remixState.isProcessing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.primary
                     )
                 } else if (remixState.isComplete) {
@@ -103,7 +106,7 @@ fun VideoRemixProcessingScreen(
                         imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Complete",
                         tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -265,7 +268,7 @@ fun VideoRemixProcessingScreen(
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Filled.PlayCircle, contentDescription = null)
+                                    Icon(Icons.Filled.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Watch on YouTube (${ytUrl.takeLast(11)})")
                                 }
@@ -283,7 +286,7 @@ fun VideoRemixProcessingScreen(
                                     Icon(
                                         if (remixState.isSavedToGallery) Icons.Filled.Check else Icons.Filled.Download,
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(if (remixState.isSavedToGallery) "Saved" else "Save MP4")
@@ -294,7 +297,7 @@ fun VideoRemixProcessingScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Share Video")
                                 }
@@ -305,7 +308,7 @@ fun VideoRemixProcessingScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Filled.Add, contentDescription = null)
+                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Process Another Video")
                             }
@@ -330,7 +333,7 @@ fun VideoRemixProcessingScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Filled.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                                 Text(
                                     text = "Processing Error",
                                     style = MaterialTheme.typography.titleSmall,
@@ -380,12 +383,12 @@ fun PipelineStepRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // EXACT PIPELINE SYMBOLS: ✓, ⏳, ○, ✗
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(28.dp)
                 .clip(CircleShape)
                 .background(
                     when (status) {
@@ -411,7 +414,8 @@ fun PipelineStepRow(
                 PipelineStepStatus.COMPLETED -> {
                     Text(
                         text = "✓",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFF2E7D32)
                     )
@@ -419,13 +423,15 @@ fun PipelineStepRow(
                 PipelineStepStatus.IN_PROGRESS -> {
                     Text(
                         text = "⏳",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 12.sp
                     )
                 }
                 PipelineStepStatus.FAILED -> {
                     Text(
                         text = "✗",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -433,7 +439,8 @@ fun PipelineStepRow(
                 PipelineStepStatus.PENDING -> {
                     Text(
                         text = "○",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }

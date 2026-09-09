@@ -210,12 +210,12 @@ fun AudioPlayerBar(
                             val newPos = (playerState.currentPositionMs - 10000L).coerceAtLeast(0L)
                             onSeek(newPos)
                         },
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Replay10,
                             contentDescription = "Rewind 10s",
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -234,13 +234,13 @@ fun AudioPlayerBar(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(48.dp)
                             .testTag("player_play_pause_button")
                     ) {
                         Icon(
                             imageVector = if (playerState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (playerState.isPlaying) "Pause" else "Play",
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
 
@@ -250,12 +250,12 @@ fun AudioPlayerBar(
                             val newPos = (playerState.currentPositionMs + 10000L).coerceAtMost(playerState.totalDurationMs)
                             onSeek(newPos)
                         },
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Forward10,
                             contentDescription = "Forward 10s",
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }

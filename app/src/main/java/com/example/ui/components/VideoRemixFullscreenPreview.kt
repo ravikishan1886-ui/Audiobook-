@@ -62,12 +62,15 @@ fun VideoRemixFullscreenPreview(
                 ) {
                     IconButton(
                         onClick = onEditClick,
-                        modifier = Modifier.testTag("edit_button")
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("edit_button")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Edit",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Text(
@@ -86,7 +89,7 @@ fun VideoRemixFullscreenPreview(
                             Icons.Filled.CheckCircle,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     },
                     shape = RoundedCornerShape(20.dp)
@@ -100,14 +103,14 @@ fun VideoRemixFullscreenPreview(
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(scrollState)
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Video Screen Showcase Card
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(180.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .background(
                             Brush.linearGradient(
@@ -123,11 +126,11 @@ fun VideoRemixFullscreenPreview(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
                             contentAlignment = Alignment.Center
@@ -136,7 +139,7 @@ fun VideoRemixFullscreenPreview(
                                 imageVector = Icons.Filled.PlayArrow,
                                 contentDescription = "Preview Video",
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 
@@ -293,15 +296,15 @@ fun VideoRemixFullscreenPreview(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.AutoFixHigh,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                         Column {
                             Text(
@@ -343,7 +346,7 @@ fun VideoRemixFullscreenPreview(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.VideoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Text(
                                 text = "Video Source: Public URL stream",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -355,7 +358,7 @@ fun VideoRemixFullscreenPreview(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
                             Text(
                                 text = "Soundtrack: ${remixState.musicFileName}",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -367,7 +370,7 @@ fun VideoRemixFullscreenPreview(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Filled.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Text(
                                 text = "User Permission & Rights: Certified and confirmed",
                                 style = MaterialTheme.typography.bodySmall,
@@ -398,7 +401,7 @@ fun VideoRemixFullscreenPreview(
                         onClick = onEditClick,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
+                            .height(50.dp)
                             .testTag("edit_button_bottom"),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -417,7 +420,7 @@ fun VideoRemixFullscreenPreview(
                         onClick = onProcessVideoClick,
                         modifier = Modifier
                             .weight(1.4f)
-                            .height(52.dp)
+                            .height(50.dp)
                             .testTag("process_video_button"),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -425,7 +428,7 @@ fun VideoRemixFullscreenPreview(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
-                        Icon(Icons.Filled.Memory, contentDescription = null)
+                        Icon(Icons.Filled.Memory, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Process Video",

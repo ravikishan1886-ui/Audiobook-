@@ -110,7 +110,7 @@ fun AudiobookDashboard(
                                     imageVector = if (selectedTab == 0) Icons.Filled.Audiotrack else Icons.Filled.Movie,
                                     contentDescription = "Logo",
                                     tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             Column {
@@ -131,12 +131,15 @@ fun AudiobookDashboard(
                     actions = {
                         IconButton(
                             onClick = { viewModel.openSettings(true) },
-                            modifier = Modifier.testTag("open_settings_button")
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("open_settings_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Settings,
                                 contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     },

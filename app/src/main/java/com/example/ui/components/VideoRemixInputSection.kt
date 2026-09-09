@@ -115,8 +115,8 @@ fun VideoRemixInputSection(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
@@ -124,13 +124,13 @@ fun VideoRemixInputSection(
                         imageVector = Icons.Filled.Movie,
                         contentDescription = "Video Remixer",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Column {
                     Text(
                         text = "Video & Music Overlay",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -161,13 +161,13 @@ fun VideoRemixInputSection(
                         .testTag("video_url_input"),
                     placeholder = { Text("Paste public MP4 / video link (https://...)") },
                     leadingIcon = {
-                        Icon(Icons.Outlined.Link, contentDescription = "URL", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.Link, contentDescription = "URL", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     },
                     trailingIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (remixState.videoUrl.isNotBlank()) {
-                                IconButton(onClick = { onVideoUrlChange("") }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Clear")
+                                IconButton(onClick = { onVideoUrlChange("") }, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(18.dp))
                                 }
                             }
                             IconButton(
@@ -177,9 +177,11 @@ fun VideoRemixInputSection(
                                         onVideoUrlChange(clip.text.trim())
                                     }
                                 },
-                                modifier = Modifier.testTag("paste_url_button")
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .testTag("paste_url_button")
                             ) {
-                                Icon(Icons.Outlined.ContentPaste, contentDescription = "Paste", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Outlined.ContentPaste, contentDescription = "Paste", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                             }
                         }
                     },
@@ -204,7 +206,7 @@ fun VideoRemixInputSection(
                             onClick = { onSampleVideoSelected(sample) },
                             label = { Text("${sample.title.take(16)}... (${sample.durationLabel})", style = MaterialTheme.typography.labelSmall) },
                             leadingIcon = if (isSelected) {
-                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             } else null,
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -259,7 +261,7 @@ fun VideoRemixInputSection(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Filled.Audiotrack, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Filled.Audiotrack, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                 Column {
                                     Text(
                                         text = remixState.musicFileName,
@@ -274,7 +276,7 @@ fun VideoRemixInputSection(
                                     )
                                 }
                             }
-                            Icon(Icons.Filled.CheckCircle, contentDescription = "Ready", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Filled.CheckCircle, contentDescription = "Ready", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -296,7 +298,7 @@ fun VideoRemixInputSection(
                             onClick = { onSampleMusicSelected(sample) },
                             label = { Text("${sample.title.take(15)} (${sample.durationLabel})", style = MaterialTheme.typography.labelSmall) },
                             leadingIcon = if (isSelected) {
-                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             } else null,
                             shape = RoundedCornerShape(8.dp)
                         )
@@ -356,7 +358,7 @@ fun VideoRemixInputSection(
                 enabled = canProceed,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(50.dp)
                     .testTag("next_to_preview_button"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -370,7 +372,7 @@ fun VideoRemixInputSection(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
             }
 
             if (!canProceed) {

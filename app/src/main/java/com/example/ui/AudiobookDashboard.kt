@@ -179,7 +179,7 @@ fun AudiobookDashboard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Text("AI Audiobook", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
                             }
                         },

@@ -477,11 +477,12 @@ object VideoMusicRemixerEngine {
             onProgress(0.1f, "Inspecting audio format...")
 
             // Inspect WAV or decode audio to 44100Hz 16-bit stereo PCM
+            val effectiveTargetDurationMs = targetDurationMs.coerceAtLeast(1000L)
             val sampleRate = 44100
             val channels = 2
             val bitsPerSample = 16
             val bytesPerSecond = sampleRate * channels * (bitsPerSample / 8)
-            val targetBytes = (targetDurationMs * bytesPerSecond) / 1000L
+            val targetBytes = (effectiveTargetDurationMs * bytesPerSecond) / 1000L
 
             // Read source audio bytes (skipping 44-byte WAV header if present)
             val sourceAudioBytes = ByteArrayOutputStream()
@@ -702,11 +703,12 @@ object VideoMusicRemixerEngine {
                 var audioDone = false
 
                 var loopIdleIterations = 0
+                val audioBytesPerSec = (audioSampleRate * audioChannels * 2).coerceAtLeast(1)
                 while ((!videoEos || !audioDone) && loopIdleIterations < 2000) {
                     var didWork = false
 
                     val currentVideoPtsUs = if (!videoEos) videoExtractor.sampleTime else Long.MAX_VALUE
-                    val currentAudioPtsUs = (audioBytesReadTotal * 1_000_000L) / (audioSampleRate * audioChannels * 2)
+                    val currentAudioPtsUs = (audioBytesReadTotal * 1_000_000L) / audioBytesPerSec
 
                     // 1. Feed video sample if video PTS <= audio PTS
                     if (!videoEos && (currentVideoPtsUs <= currentAudioPtsUs || audioDone)) {
@@ -743,7 +745,7 @@ object VideoMusicRemixerEngine {
                             if (inBuf != null) {
                                 inBuf.clear()
                                 val read = audioInputStream.read(pcmChunk)
-                                val ptsUs = (audioBytesReadTotal * 1_000_000L) / (audioSampleRate * audioChannels * 2)
+                                val ptsUs = (audioBytesReadTotal * 1_000_000L) / audioBytesPerSec
                                 if (read <= 0 || (ptsUs >= targetDurationUs && targetDurationUs > 0)) {
                                     audioEncoder.queueInputBuffer(inIdx, 0, 0, ptsUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                                     audioEos = true

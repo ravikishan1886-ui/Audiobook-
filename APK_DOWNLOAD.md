@@ -10,8 +10,8 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~23 MB (23,257,034 bytes) |
-| **SHA-256 Checksum** | `3d2f59349cc1335caa7519dba180fbb18c0ada05ad61debf03d6c957cbe80367` |
+| **File Size** | ~23 MB (23,257,171 bytes) |
+| **SHA-256 Checksum** | `a3f31563c1e646ec8263b2022c3b829674b10d80b663c3d30b3f245b573d4f6d` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 

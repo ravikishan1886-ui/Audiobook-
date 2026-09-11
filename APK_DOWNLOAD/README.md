@@ -5,8 +5,8 @@ Download the compiled Android application package below:
 ### ⬇️ **[Download `app-debug.apk` (Raw)](./app-debug.apk?raw=true)**
 
 - **File**: `app-debug.apk`
-- **Size**: ~23 MB (23,257,034 bytes)
-- **SHA-256**: `3d2f59349cc1335caa7519dba180fbb18c0ada05ad61debf03d6c957cbe80367`
+- **Size**: ~23 MB (23,257,171 bytes)
+- **SHA-256**: `a3f31563c1e646ec8263b2022c3b829674b10d80b663c3d30b3f245b573d4f6d`
 - **Minimum Android**: Android 7.0 (API 24)
 - **Target Android**: Android 14+ / 16 (API 36)
 

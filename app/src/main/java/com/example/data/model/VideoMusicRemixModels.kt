@@ -45,7 +45,7 @@ data class SampleMusicOption(
 data class VideoMusicRemixState(
     val currentView: RemixViewMode = RemixViewMode.INPUT,
     val videoUrl: String = "",
-    val musicFileName: String = "",
+    val musicFileName: String = "Original Video Audio (Keep Same Music)",
     val musicFileUri: Uri? = null,
     val localMusicFile: File? = null,
     val downloadedVideoFile: File? = null,

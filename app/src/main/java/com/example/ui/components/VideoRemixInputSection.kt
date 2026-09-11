@@ -66,6 +66,12 @@ val SAMPLE_VIDEOS = listOf(
 
 val SAMPLE_MUSICS = listOf(
     SampleMusicOption(
+        title = "Original Video Audio (Keep Same Music)",
+        durationLabel = "Original",
+        durationMs = 0L,
+        genre = "Original Video Soundtrack"
+    ),
+    SampleMusicOption(
         title = "Lofi Ambient Chillhop",
         durationLabel = "03:15",
         durationMs = 195000L,
@@ -357,15 +363,18 @@ fun VideoRemixInputSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SAMPLE_MUSICS.forEach { sample ->
                         val isSelected = remixState.musicFileName == sample.title
+                        val labelText = if (sample.title.startsWith("Original")) "🎵 Original Video Audio" else "${sample.title.take(20)} (${sample.durationLabel})"
                         FilterChip(
                             selected = isSelected,
                             onClick = { onSampleMusicSelected(sample) },
-                            label = { Text("${sample.title.take(15)} (${sample.durationLabel})", style = MaterialTheme.typography.labelSmall) },
+                            label = { Text(labelText, style = MaterialTheme.typography.labelSmall) },
                             leadingIcon = if (isSelected) {
                                 { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             } else null,

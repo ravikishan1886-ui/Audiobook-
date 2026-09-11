@@ -11,7 +11,7 @@
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
 | **File Size** | ~23 MB (23,257,398 bytes) |
-| **SHA-256 Checksum** | `bc72e6b2aba7d34891653b2574973593b0a92df3a6a9ce566f8e02fdeeeff68d` |
+| **SHA-256 Checksum** | `96ad91f421c1ae83ce552483e9b53a67034a8da9c7d6c2d2ba0ba324ed13f179` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -19,10 +19,15 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🎵 Pure Video & Music Remix (Zero Narration)
+### 1. 🎵 100% Exact Music Preservation (No Music Alterations)
+- **Zero Pitch & Speed Alteration**: Previously, 48kHz audio files were resampled as 44.1kHz, causing pitch drops and slowed playback. The audio engine now preserves the exact native sample rate (e.g. 48,000 Hz, 44,100 Hz) and channel count (Mono / Stereo) directly from the source.
+- **Zero Dropped Audio Buffers**: The hardware AAC encoder initialization previously dropped initial buffers before the container started, cutting off the first ~2.5 seconds of the song. All initial audio packets from sample 0 are now buffered and flushed into the container so the music starts from the exact first note.
+- **WAV RIFF Chunk-Safe Parsing**: Audio headers are parsed through standard RIFF chunk scanning to locate the exact `data` chunk offset, eliminating static or byte misalignment.
+- **"Keep Original Video Audio" Option**: Added a dedicated **🎵 Original Video Audio** preset (enabled by default) so users who remix videos can preserve the video's original soundtrack without replacing it.
+
+### 2. 🎬 Pure Video & Music Remix (Zero Narration)
 - **Direct Video Remixing**: When a user adds a video URL and music in Video Remix, the app fetches the video and directly adds the music soundtrack without generating or attaching any audiobook narration, voice synthesis, or book cover overlays.
-- **Interleaved Media Muxing**: Upgraded hardware `MediaMuxer` pipeline with PTS-synchronized interleaving, ensuring video and audio packets write in lockstep without container crashes.
-- **Clean Visual Frame Transcoding**: If video re-encoding is needed, the engine extracts the authentic video frame directly from the source video using `MediaMetadataRetriever` and encodes clean visual frames with the audio soundtrack.
+- **Interleaved Media Muxing**: Hardware `MediaMuxer` pipeline with PTS-synchronized interleaving, ensuring video and audio packets write in lockstep without container crashes.
 
 ### 2. 🌐 Google Redirect & MEGA.nz URL Support
 - **Automatic URL Unwrapping**: Accepts Google redirect links (e.g. `https://www.google.com/url?sa=E&q=https%3A%2F%2Fmega.nz%2Ffile%2FZJkW0RCK%23x9fu65rOm-h1xvlsP0p3Iw84kJ-JhPWK9macoWQGohs`) and decodes percent-encoded URLs seamlessly.

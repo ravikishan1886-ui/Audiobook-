@@ -1336,8 +1336,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         if (state.musicFileName.isBlank()) {
-            _remixState.update { it.copy(errorMessage = "Please upload or select an audio file first") }
-            return
+            _remixState.update { it.copy(musicFileName = "Original Video Audio (Keep Same Music)") }
         }
         if (!state.hasRightsPermission) {
             _remixState.update { it.copy(errorMessage = "Please confirm permission to use these media files") }
@@ -1368,8 +1367,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         if (state.musicFileName.isBlank()) {
-            _remixState.update { it.copy(errorMessage = "Please upload or select an audio file") }
-            return
+            _remixState.update { it.copy(musicFileName = "Original Video Audio (Keep Same Music)") }
         }
         if (!state.hasRightsPermission) {
             _remixState.update { it.copy(errorMessage = "Please confirm legal permission to process this media") }
@@ -1447,8 +1445,13 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
 
+                val isOriginalAudio = state.musicFileUri == null && 
+                    (state.musicFileName.isBlank() || state.musicFileName.contains("Original", ignoreCase = true))
+
                 val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
                     context = context,
+                    videoFile = videoFile,
+                    isOriginalAudio = isOriginalAudio,
                     musicUri = state.musicFileUri,
                     sampleTitle = state.musicFileName,
                     sampleDurationMs = state.musicDurationMs,

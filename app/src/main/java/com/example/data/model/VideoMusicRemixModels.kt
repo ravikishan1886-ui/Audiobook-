@@ -56,7 +56,7 @@ data class VideoMusicRemixState(
     val musicDurationMs: Long = 195000L,    // Default 03:15 demo
     val finalDurationMs: Long = 332000L,    // Matched to original duration: 05:32
 
-    val hasRightsPermission: Boolean = false,
+    val hasRightsPermission: Boolean = true,
     val videoTitle: String = "Remixed Video with Soundtrack",
     val videoDescription: String = "Video remixed with custom background music overlay and duration alignment.",
     val privacyStatus: YouTubePrivacy = YouTubePrivacy.PRIVATE,

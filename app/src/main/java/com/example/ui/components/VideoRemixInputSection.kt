@@ -89,6 +89,7 @@ fun VideoRemixInputSection(
     onSampleMusicSelected: (SampleMusicOption) -> Unit,
     onRightsConfirmedChange: (Boolean) -> Unit,
     onNextToPreview: () -> Unit,
+    onDirectRemixNow: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -137,15 +138,40 @@ fun VideoRemixInputSection(
                 }
                 Column {
                     Text(
-                        text = "Video & Music Overlay",
+                        text = "Video & Music Remixer",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Align soundtrack duration, render MP4 & upload to YouTube",
+                        text = "Pure Video & Music Remix • No AI narration or voice synthesis",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Pure Remix Mode Banner
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Direct video remixing: The app fetches the video from your URL, loops/trims your music track to match the video, and renders the remixed MP4 with zero audiobook narration.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -385,31 +411,56 @@ fun VideoRemixInputSection(
                 }
             }
 
-            // Next / Proceed Button
+            // Action Buttons
             val canProceed = remixState.videoUrl.isNotBlank() &&
                     remixState.musicFileName.isNotBlank() &&
                     remixState.hasRightsPermission
 
-            Button(
-                onClick = onNextToPreview,
-                enabled = canProceed,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .testTag("next_to_preview_button"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "Next: Fullscreen Preview & Durations",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                // Primary: Direct Remix (Fetch video from URL + Add Music + Render Remixed MP4)
+                Button(
+                    onClick = onDirectRemixNow,
+                    enabled = canProceed,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("direct_remix_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(Icons.Filled.MovieFilter, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Remix Video with Music (No Narration)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Secondary: Preview Durations & Video Settings
+                OutlinedButton(
+                    onClick = onNextToPreview,
+                    enabled = canProceed,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("next_to_preview_button"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Fullscreen Preview & Settings",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             if (!canProceed) {

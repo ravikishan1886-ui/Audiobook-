@@ -41,6 +41,7 @@ fun VideoRemixProcessingScreen(
     onWatchYouTube: (String) -> Unit,
     onRetry: () -> Unit,
     onProcessAnother: () -> Unit,
+    onPlayVideo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -279,6 +280,23 @@ fun VideoRemixProcessingScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+
+                            // Play Remixed Video button
+                            if (remixState.renderedMp4File != null && remixState.renderedMp4File.exists()) {
+                                Button(
+                                    onClick = onPlayVideo,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().testTag("play_remixed_video_button")
+                                ) {
+                                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Play Remixed Video with Music", fontWeight = FontWeight.Bold)
                                 }
                             }
 

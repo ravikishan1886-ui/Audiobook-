@@ -10,8 +10,8 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~23 MB (23,218,404 bytes) |
-| **SHA-256 Checksum** | `bbd8eada178f836f255466fed7e506ff5b69471b531447f4886cd68ae77f737a` |
+| **File Size** | ~23 MB (23,257,034 bytes) |
+| **SHA-256 Checksum** | `3d2f59349cc1335caa7519dba180fbb18c0ada05ad61debf03d6c957cbe80367` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -19,7 +19,12 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🌐 Google Redirect & MEGA.nz URL Support
+### 1. 🎵 Pure Video & Music Remix (Zero Narration)
+- **Direct Video Remixing**: When a user adds a video URL and music in Video Remix, the app fetches the video and directly adds the music soundtrack without generating or attaching any audiobook narration, voice synthesis, or book cover overlays.
+- **Interleaved Media Muxing**: Upgraded hardware `MediaMuxer` pipeline with PTS-synchronized interleaving, ensuring video and audio packets write in lockstep without container crashes.
+- **Clean Visual Frame Transcoding**: If video re-encoding is needed, the engine extracts the authentic video frame directly from the source video using `MediaMetadataRetriever` and encodes clean visual frames with the audio soundtrack.
+
+### 2. 🌐 Google Redirect & MEGA.nz URL Support
 - **Automatic URL Unwrapping**: Accepts Google redirect links (e.g. `https://www.google.com/url?sa=E&q=https%3A%2F%2Fmega.nz%2Ffile%2FZJkW0RCK%23x9fu65rOm-h1xvlsP0p3Iw84kJ-JhPWK9macoWQGohs`) and decodes percent-encoded URLs seamlessly.
 - **MEGA Cloud Storage Integration**:
   - Connects to MEGA API (`https://g.api.mega.co.nz/cs`) to resolve direct encrypted storage endpoints.

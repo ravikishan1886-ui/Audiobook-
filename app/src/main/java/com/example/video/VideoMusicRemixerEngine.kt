@@ -1,6 +1,7 @@
 package com.example.video
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.*
 import android.net.Uri
 import android.util.Log
@@ -48,6 +49,22 @@ object VideoMusicRemixerEngine {
             }
 
             val remixDir = File(context.cacheDir, "video_remix").apply { if (!exists()) mkdirs() }
+
+            // Check if local file or content URI
+            if (cleanUrl.startsWith("content://") || cleanUrl.startsWith("file://")) {
+                val uri = Uri.parse(cleanUrl)
+                onProgress(0.1f, "Reading local video file...")
+                val localOut = File(remixDir, "local_source_${System.currentTimeMillis()}.mp4")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(localOut).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (localOut.exists() && localOut.length() > 0) {
+                    onProgress(1.0f, "Local video loaded (${localOut.length() / (1024 * 1024)} MB)")
+                    return@withContext Result.success(localOut)
+                }
+            }
 
             // Check if this is a MEGA.nz Cloud link
             val megaInfo = VideoUrlUtils.extractMegaFileInfo(cleanUrl)
@@ -222,6 +239,7 @@ object VideoMusicRemixerEngine {
 
     /**
      * Resolves and copies an uploaded audio file or generates a sample music file.
+     * Decodes any audio format (MP3, AAC, M4A, OGG, WAV) into standard 44.1kHz 16-bit PCM WAV.
      */
     suspend fun prepareMusicFile(
         context: Context,
@@ -236,11 +254,23 @@ object VideoMusicRemixerEngine {
 
             if (musicUri != null) {
                 onProgress(0.2f, "Reading uploaded music file...")
+                val rawTemp = File(remixDir, "raw_music_temp_${System.currentTimeMillis()}.tmp")
                 context.contentResolver.openInputStream(musicUri)?.use { input ->
-                    FileOutputStream(outputFile).use { output ->
+                    FileOutputStream(rawTemp).use { output ->
                         input.copyTo(output)
                     }
                 } ?: return@withContext Result.failure(IOException("Cannot open stream for selected audio URI"))
+
+                onProgress(0.5f, "Decoding music to crystal-clear PCM audio...")
+                val decoded = decodeAudioToPcmWav(rawTemp, outputFile)
+                try { rawTemp.delete() } catch (_: Exception) {}
+
+                if (!decoded || !outputFile.exists() || outputFile.length() == 0L) {
+                    // Fallback to raw copy if decoding could not extract tracks
+                    context.contentResolver.openInputStream(musicUri)?.use { input ->
+                        FileOutputStream(outputFile).use { output -> input.copyTo(output) }
+                    }
+                }
 
                 onProgress(1.0f, "Music file loaded (${outputFile.length() / 1024} KB)")
                 Result.success(outputFile)
@@ -255,6 +285,121 @@ object VideoMusicRemixerEngine {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to prepare music file", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Decodes any audio file (MP3, AAC, M4A, OGG, WAV) into standard 44.1kHz 16-bit stereo PCM WAV.
+     */
+    fun decodeAudioToPcmWav(sourceAudioFile: File, outputWavFile: File): Boolean {
+        var extractor: MediaExtractor? = null
+        var decoder: MediaCodec? = null
+        return try {
+            // If already PCM WAV with RIFF header, copy directly
+            if (sourceAudioFile.length() > 44) {
+                val header = ByteArray(44)
+                FileInputStream(sourceAudioFile).use { it.read(header) }
+                if (header[0] == 'R'.code.toByte() && header[1] == 'I'.code.toByte() &&
+                    header[2] == 'F'.code.toByte() && header[3] == 'F'.code.toByte() &&
+                    header[8] == 'W'.code.toByte() && header[9] == 'A'.code.toByte() &&
+                    header[10] == 'V'.code.toByte() && header[11] == 'E'.code.toByte()
+                ) {
+                    val audioFormat = (header[20].toInt() and 0xFF) or ((header[21].toInt() and 0xFF) shl 8)
+                    if (audioFormat == 1) { // PCM format code
+                        sourceAudioFile.copyTo(outputWavFile, overwrite = true)
+                        return true
+                    }
+                }
+            }
+
+            extractor = MediaExtractor().apply { setDataSource(sourceAudioFile.absolutePath) }
+            var audioTrackIndex = -1
+            var audioFormat: MediaFormat? = null
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                if (mime.startsWith("audio/")) {
+                    audioTrackIndex = i
+                    audioFormat = format
+                    break
+                }
+            }
+
+            if (audioTrackIndex < 0 || audioFormat == null) {
+                return false
+            }
+
+            extractor.selectTrack(audioTrackIndex)
+            val mime = audioFormat.getString(MediaFormat.KEY_MIME) ?: "audio/mp4a-latm"
+            decoder = MediaCodec.createDecoderByType(mime).apply {
+                configure(audioFormat, null, null, 0)
+                start()
+            }
+
+            val sampleRate = if (audioFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE))
+                audioFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE) else 44100
+            val channels = if (audioFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT))
+                audioFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
+
+            val pcmOutStream = ByteArrayOutputStream()
+            val bufferInfo = MediaCodec.BufferInfo()
+            var isInputEos = false
+            var isOutputEos = false
+
+            while (!isOutputEos) {
+                if (!isInputEos) {
+                    val inIndex = decoder.dequeueInputBuffer(5000)
+                    if (inIndex >= 0) {
+                        val inBuffer = decoder.getInputBuffer(inIndex)
+                        if (inBuffer != null) {
+                            val sampleSize = extractor.readSampleData(inBuffer, 0)
+                            if (sampleSize < 0) {
+                                decoder.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                isInputEos = true
+                            } else {
+                                val sampleTime = extractor.sampleTime
+                                decoder.queueInputBuffer(inIndex, 0, sampleSize, sampleTime, 0)
+                                extractor.advance()
+                            }
+                        }
+                    }
+                }
+
+                val outIndex = decoder.dequeueOutputBuffer(bufferInfo, 5000)
+                if (outIndex >= 0) {
+                    val outBuffer = decoder.getOutputBuffer(outIndex)
+                    if (outBuffer != null && bufferInfo.size > 0) {
+                        outBuffer.position(bufferInfo.offset)
+                        outBuffer.limit(bufferInfo.offset + bufferInfo.size)
+                        val chunk = ByteArray(bufferInfo.size)
+                        outBuffer.get(chunk)
+                        pcmOutStream.write(chunk)
+                    }
+                    if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        isOutputEos = true
+                    }
+                    decoder.releaseOutputBuffer(outIndex, false)
+                }
+            }
+
+            val pcmData = pcmOutStream.toByteArray()
+            if (pcmData.isNotEmpty()) {
+                FileOutputStream(outputWavFile).use { fos ->
+                    val header = createWavHeader(pcmData.size.toLong(), sampleRate, channels, 16)
+                    fos.write(header)
+                    fos.write(pcmData)
+                }
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Audio decode exception: ${e.message}")
+            false
+        } finally {
+            try { decoder?.stop() } catch (_: Exception) {}
+            try { decoder?.release() } catch (_: Exception) {}
+            try { extractor?.release() } catch (_: Exception) {}
         }
     }
 
@@ -550,37 +695,48 @@ object VideoMusicRemixerEngine {
                 muxerStarted = true
                 onProgress(0.2f, "Muxing video and audio tracks...")
 
-                // Mux video samples
+                // Interleaved feeding & writing loop (PTS-synchronized to prevent MediaMuxer out-of-order crashes)
                 var videoFramesWritten = 0
                 val targetDurationUs = targetDurationMs * 1000L
                 var lastVideoPtsUs = 0L
+                var audioDone = false
 
-                while (!videoEos) {
-                    videoBuffer.clear()
-                    val sampleSize = videoExtractor.readSampleData(videoBuffer, 0)
-                    if (sampleSize < 0 || (lastVideoPtsUs >= targetDurationUs && targetDurationUs > 0)) {
-                        videoEos = true
-                        break
+                var loopIdleIterations = 0
+                while ((!videoEos || !audioDone) && loopIdleIterations < 2000) {
+                    var didWork = false
+
+                    val currentVideoPtsUs = if (!videoEos) videoExtractor.sampleTime else Long.MAX_VALUE
+                    val currentAudioPtsUs = (audioBytesReadTotal * 1_000_000L) / (audioSampleRate * audioChannels * 2)
+
+                    // 1. Feed video sample if video PTS <= audio PTS
+                    if (!videoEos && (currentVideoPtsUs <= currentAudioPtsUs || audioDone)) {
+                        videoBuffer.clear()
+                        val sampleSize = videoExtractor.readSampleData(videoBuffer, 0)
+                        if (sampleSize < 0 || (lastVideoPtsUs >= targetDurationUs && targetDurationUs > 0)) {
+                            videoEos = true
+                        } else {
+                            val sampleTimeUs = videoExtractor.sampleTime
+                            val sampleFlags = videoExtractor.sampleFlags
+
+                            videoBufferInfo.set(0, sampleSize, sampleTimeUs, sampleFlags)
+                            try {
+                                muxer.writeSampleData(videoMuxerTrackIndex, videoBuffer, videoBufferInfo)
+                                lastVideoPtsUs = sampleTimeUs
+                                videoFramesWritten++
+                                didWork = true
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Video sample write: ${e.message}")
+                            }
+
+                            val progress = if (targetDurationUs > 0) (sampleTimeUs.toFloat() / targetDurationUs.toFloat()).coerceIn(0f, 1f) else 0.5f
+                            onProgress(0.2f + progress * 0.4f, "Encoding video frames: ${(progress * 100).toInt()}%")
+
+                            videoExtractor.advance()
+                        }
                     }
 
-                    val sampleTimeUs = videoExtractor.sampleTime
-                    val sampleFlags = videoExtractor.sampleFlags
-
-                    videoBufferInfo.set(0, sampleSize, sampleTimeUs, sampleFlags)
-                    muxer.writeSampleData(videoMuxerTrackIndex, videoBuffer, videoBufferInfo)
-                    lastVideoPtsUs = sampleTimeUs
-                    videoFramesWritten++
-
-                    val progress = if (targetDurationUs > 0) (sampleTimeUs.toFloat() / targetDurationUs.toFloat()).coerceIn(0f, 1f) else 0.5f
-                    onProgress(0.2f + progress * 0.4f, "Encoding video frames: ${(progress * 100).toInt()}%")
-
-                    videoExtractor.advance()
-                }
-
-                // Finish and drain remaining audio
-                var audioDone = false
-                while (!audioDone) {
-                    if (!audioEos) {
+                    // 2. Feed audio PCM chunk to audio encoder
+                    if (!audioEos && (currentAudioPtsUs <= currentVideoPtsUs || videoEos)) {
                         val inIdx = audioEncoder.dequeueInputBuffer(2000)
                         if (inIdx >= 0) {
                             val inBuf = audioEncoder.getInputBuffer(inIdx)
@@ -596,23 +752,31 @@ object VideoMusicRemixerEngine {
                                     audioEncoder.queueInputBuffer(inIdx, 0, read, ptsUs, 0)
                                     audioBytesReadTotal += read
                                 }
+                                didWork = true
                             }
                         }
                     }
 
-                    val outIdx = audioEncoder.dequeueOutputBuffer(audioBufferInfo, 2000)
-                    if (outIdx >= 0) {
+                    // 3. Drain audio encoder output and write to muxer
+                    var outIdx = audioEncoder.dequeueOutputBuffer(audioBufferInfo, 2000)
+                    while (outIdx >= 0) {
+                        didWork = true
                         val outBuf = audioEncoder.getOutputBuffer(outIdx)
                         if (outBuf != null && (audioBufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && audioBufferInfo.size > 0) {
-                            muxer.writeSampleData(audioMuxerTrackIndex, outBuf, audioBufferInfo)
+                            try {
+                                muxer.writeSampleData(audioMuxerTrackIndex, outBuf, audioBufferInfo)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Audio sample write: ${e.message}")
+                            }
                         }
                         if ((audioBufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                             audioDone = true
                         }
                         audioEncoder.releaseOutputBuffer(outIdx, false)
-                    } else if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER && audioEos) {
-                        audioDone = true
+                        outIdx = audioEncoder.dequeueOutputBuffer(audioBufferInfo, 0)
                     }
+
+                    if (didWork) loopIdleIterations = 0 else loopIdleIterations++
                 }
 
                 onProgress(0.95f, "Finalizing MP4 container...")
@@ -640,7 +804,10 @@ object VideoMusicRemixerEngine {
     }
 
     /**
-     * Fallback video renderer using VideoGenerator pipeline if source container couldn't be demuxed.
+     * Fallback video-music remuxer/transcoder using VideoGenerator pipeline.
+     * Extracts the real video frame from the user's video using MediaMetadataRetriever
+     * and encodes it with the music soundtrack.
+     * STRICTLY NO AUDIOBOOK NARRATION, NO AUDIOBOOK COVERS, NO TEXT OVERLAYS.
      */
     private suspend fun fallbackRenderVideo(
         context: Context,
@@ -651,22 +818,44 @@ object VideoMusicRemixerEngine {
         onProgress: (Float, String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
-            onProgress(0.3f, "Rendering video soundtrack overlay...")
-            val result = VideoGenerator.convertAudioToMp4(
+            onProgress(0.1f, "Extracting video frames for hardware remix...")
+
+            // Extract a visual frame from the user's video using MediaMetadataRetriever
+            var frameBitmap: Bitmap? = null
+            try {
+                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(videoFile.absolutePath)
+                frameBitmap = retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?: retriever.frameAtTime
+                retriever.release()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not extract video frame: ${e.message}")
+            }
+
+            if (frameBitmap == null) {
+                frameBitmap = Bitmap.createBitmap(1280, 720, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.DKGRAY)
+                }
+            }
+
+            onProgress(0.25f, "Encoding pure video remix with music soundtrack...")
+            val result = VideoGenerator.renderVideoWithVisualFrame(
                 context = context,
+                frameBitmap = frameBitmap,
                 audioWavFile = audioWavFile,
-                bookTitle = "Remixed Video Soundtrack",
-                author = "Video Audio Overlay",
-                voiceName = "Full Stereo Music",
-                chaptersCount = 1,
-                customThumbnailFile = null,
+                targetDurationMs = targetDurationMs,
                 onProgress = { p ->
-                    onProgress(0.3f + p * 0.65f, "Rendering video stream: ${(p * 100).toInt()}%")
+                    onProgress(0.25f + p * 0.70f, "Remixing video with music: ${(p * 100).toInt()}%")
                 }
             )
+
+            try {
+                if (!frameBitmap.isRecycled) frameBitmap.recycle()
+            } catch (_: Exception) {}
+
             result
         } catch (e: Exception) {
-            Log.e(TAG, "Fallback video render failed", e)
+            Log.e(TAG, "Video remix render failed", e)
             Result.failure(e)
         }
     }

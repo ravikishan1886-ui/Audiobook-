@@ -69,7 +69,8 @@ fun AudiobookDashboard(
                 } catch (_: Exception) {}
             },
             onRetry = { viewModel.startVideoProcessing() },
-            onProcessAnother = { viewModel.resetRemixState() }
+            onProcessAnother = { viewModel.resetRemixState() },
+            onPlayVideo = { viewModel.playRemixedVideo() }
         )
         return
     }
@@ -107,7 +108,7 @@ fun AudiobookDashboard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (selectedTab == 0) Icons.Filled.Audiotrack else Icons.Filled.Movie,
+                                    imageVector = if (selectedTab == 0) Icons.Filled.Movie else Icons.Filled.Audiotrack,
                                     contentDescription = "Logo",
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(20.dp)
@@ -115,13 +116,13 @@ fun AudiobookDashboard(
                             }
                             Column {
                                 Text(
-                                    text = if (selectedTab == 0) "AI Audiobook Studio" else "Video & Music Remixer",
+                                    text = if (selectedTab == 0) "Video & Music Remixer" else "AI Audiobook Studio",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (selectedTab == 0) "Gemini AI & cvoice.ai Engine" else "Hardware Muxer & YouTube Upload",
+                                    text = if (selectedTab == 0) "Hardware Muxer • Zero Narration" else "Gemini AI & cvoice.ai Engine",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -164,11 +165,11 @@ fun AudiobookDashboard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("AI Audiobook", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
+                                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Video Remixer", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
                             }
                         },
-                        modifier = Modifier.testTag("tab_audiobook")
+                        modifier = Modifier.testTag("tab_remixer")
                     )
                     Tab(
                         selected = selectedTab == 1,
@@ -178,17 +179,17 @@ fun AudiobookDashboard(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Video Remixer", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                                Icon(Icons.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("AI Audiobook", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
                             }
                         },
-                        modifier = Modifier.testTag("tab_remixer")
+                        modifier = Modifier.testTag("tab_audiobook")
                     )
                 }
             }
         }
     ) { innerPadding ->
-        if (selectedTab == 1) {
+        if (selectedTab == 0) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -204,7 +205,8 @@ fun AudiobookDashboard(
                     onSampleVideoSelected = { viewModel.selectSampleVideo(it) },
                     onSampleMusicSelected = { viewModel.selectSampleMusic(it) },
                     onRightsConfirmedChange = { viewModel.setRemixRightsConfirmed(it) },
-                    onNextToPreview = { viewModel.openFullscreenPreview() }
+                    onNextToPreview = { viewModel.openFullscreenPreview() },
+                    onDirectRemixNow = { viewModel.startVideoProcessing() }
                 )
             }
         } else {

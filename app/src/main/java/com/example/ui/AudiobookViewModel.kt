@@ -2,9 +2,11 @@ package com.example.ui
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AudioMerger
@@ -1410,8 +1412,21 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 )
 
                 val videoFile = videoDownloadResult.getOrElse { err ->
-                    Log.w(TAG, "Video download note: ${err.message}. Using cache reference.")
-                    File(context.cacheDir, "source_video.mp4")
+                    val fallback = File(context.cacheDir, "source_video.mp4")
+                    if (fallback.exists() && fallback.length() > 0) fallback else null
+                }
+
+                if (videoFile == null || !videoFile.exists() || videoFile.length() == 0L) {
+                    val errMsg = videoDownloadResult.exceptionOrNull()?.message ?: "Could not fetch video from URL."
+                    _remixState.update {
+                        it.copy(
+                            isProcessing = false,
+                            errorMessage = "Video fetch error: $errMsg. Please check the URL.",
+                            statusMessage = "Fetch failed",
+                            stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_RECEIVED to PipelineStepStatus.FAILED)
+                        )
+                    }
+                    return@launch
                 }
 
                 _remixState.update {
@@ -1624,6 +1639,24 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
             }
+        }
+    }
+
+    fun playRemixedVideo() {
+        val file = _remixState.value.renderedMp4File
+        if (file == null || !file.exists()) {
+            _remixState.update { it.copy(errorMessage = "No rendered video file found to play") }
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "video/mp4")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Could not open video player: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

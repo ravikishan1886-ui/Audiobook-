@@ -27,6 +27,7 @@ import com.example.data.model.*
 import com.example.data.samples.SampleBooks
 import com.example.video.VideoGenerator
 import com.example.video.VideoMusicRemixerEngine
+import com.example.video.VideoUrlUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1228,12 +1229,45 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
     // Video & Music Overlay Remixer Methods
     // ==========================================
 
-    fun updateRemixVideoUrl(url: String) {
+    fun updateRemixVideoUrl(rawUrl: String) {
+        val resolved = VideoUrlUtils.resolveSource(rawUrl)
+        val cleanUrl = resolved.cleanUrl
+
         _remixState.update {
             it.copy(
-                videoUrl = url,
+                videoUrl = cleanUrl,
+                sourceBadge = resolved.displayBadge,
+                videoTitle = resolved.detectedTitle ?: it.videoTitle,
                 errorMessage = null
             )
+        }
+
+        // If MEGA link, query metadata (filename and size) in background
+        if (resolved.isMega && resolved.megaInfo != null) {
+            viewModelScope.launch {
+                val (fileName, sizeBytes) = VideoUrlUtils.fetchMegaMetadata(
+                    resolved.megaInfo.fileId,
+                    resolved.megaInfo.fileKey
+                )
+                if (fileName != null || sizeBytes != null) {
+                    val sizeMbStr = if (sizeBytes != null) {
+                        String.format(java.util.Locale.US, "%.1f MB", sizeBytes / (1024 * 1024f))
+                    } else ""
+                    val badge = buildString {
+                        append("✓ MEGA Cloud")
+                        if (!fileName.isNullOrBlank()) append(" • $fileName")
+                        if (sizeMbStr.isNotBlank()) append(" ($sizeMbStr)")
+                    }
+                    _remixState.update { current ->
+                        current.copy(
+                            detectedFileName = fileName,
+                            fileSizeBytes = sizeBytes,
+                            sourceBadge = badge,
+                            videoTitle = fileName?.substringBeforeLast(".") ?: current.videoTitle
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -1253,13 +1287,15 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             "05:32" -> 332000L
             "09:56" -> 596000L
             "00:15" -> 15000L
-            else -> 332000L
+            "04:15" -> 255000L
+            else -> 255000L
         }
+        updateRemixVideoUrl(sample.url)
         _remixState.update {
             it.copy(
-                videoUrl = sample.url,
                 originalDurationMs = durMs,
                 finalDurationMs = durMs,
+                videoTitle = sample.title,
                 errorMessage = null
             )
         }

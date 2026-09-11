@@ -150,10 +150,15 @@ fun VideoRemixFullscreenPreview(
                             fontWeight = FontWeight.Bold
                         )
 
+                        val sourceText = when {
+                            remixState.sourceBadge.isNotBlank() -> remixState.sourceBadge
+                            remixState.detectedFileName != null -> "Source: ${remixState.detectedFileName}"
+                            else -> remixState.videoUrl.take(48) + if (remixState.videoUrl.length > 48) "..." else ""
+                        }
                         Text(
-                            text = remixState.videoUrl.take(48) + if (remixState.videoUrl.length > 48) "..." else "",
+                            text = sourceText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = Color.White.copy(alpha = 0.85f),
                             maxLines = 1
                         )
                     }

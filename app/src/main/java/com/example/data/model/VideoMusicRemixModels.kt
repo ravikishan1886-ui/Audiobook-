@@ -60,6 +60,9 @@ data class VideoMusicRemixState(
     val videoTitle: String = "Remixed Video with Soundtrack",
     val videoDescription: String = "Video remixed with custom background music overlay and duration alignment.",
     val privacyStatus: YouTubePrivacy = YouTubePrivacy.PRIVATE,
+    val sourceBadge: String = "",
+    val detectedFileName: String? = null,
+    val fileSizeBytes: Long? = null,
 
     // Processing Pipeline
     val isProcessing: Boolean = false,

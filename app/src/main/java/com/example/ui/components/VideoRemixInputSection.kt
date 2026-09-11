@@ -7,7 +7,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +32,12 @@ import com.example.data.model.SampleVideoOption
 import com.example.data.model.VideoMusicRemixState
 
 val SAMPLE_VIDEOS = listOf(
+    SampleVideoOption(
+        title = "Nefer 4K CC (MEGA Cloud)",
+        durationLabel = "04:15",
+        url = "https://www.google.com/url?sa=E&q=https%3A%2F%2Fmega.nz%2Ffile%2FZJkW0RCK%23x9fu65rOm-h1xvlsP0p3Iw84kJ-JhPWK9macoWQGohs",
+        description = "4K video from MEGA Cloud via Google redirect"
+    ),
     SampleVideoOption(
         title = "Nature Landscapes (Creative Commons)",
         durationLabel = "05:32",
@@ -159,7 +167,7 @@ fun VideoRemixInputSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("video_url_input"),
-                    placeholder = { Text("Paste public MP4 / video link (https://...)") },
+                    placeholder = { Text("Paste video link, Google redirect, or MEGA.nz...") },
                     leadingIcon = {
                         Icon(Icons.Outlined.Link, contentDescription = "URL", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     },
@@ -189,6 +197,33 @@ fun VideoRemixInputSection(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                if (remixState.sourceBadge.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.CloudDone,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = remixState.sourceBadge,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
                 // Quick sample video chips
                 Text(
                     text = "Or choose a test video sample:",
@@ -196,7 +231,9 @@ fun VideoRemixInputSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SAMPLE_VIDEOS.forEach { sample ->
@@ -204,7 +241,7 @@ fun VideoRemixInputSection(
                         FilterChip(
                             selected = isSelected,
                             onClick = { onSampleVideoSelected(sample) },
-                            label = { Text("${sample.title.take(16)}... (${sample.durationLabel})", style = MaterialTheme.typography.labelSmall) },
+                            label = { Text("${sample.title.take(18)}... (${sample.durationLabel})", style = MaterialTheme.typography.labelSmall) },
                             leadingIcon = if (isSelected) {
                                 { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             } else null,

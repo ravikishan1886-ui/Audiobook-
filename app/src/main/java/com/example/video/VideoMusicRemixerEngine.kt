@@ -8,12 +8,19 @@ import com.example.data.api.YouTubeUploader
 import com.example.data.model.YouTubePrivacy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import java.io.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import kotlin.math.sin
 
 object VideoMusicRemixerEngine {
@@ -27,6 +34,7 @@ object VideoMusicRemixerEngine {
 
     /**
      * Downloads a publicly accessible video URL to local cache with real byte progress.
+     * Supports direct MP4 links, Google redirect unwrapping, MEGA cloud files, Google Drive, and Dropbox.
      */
     suspend fun downloadVideo(
         context: Context,
@@ -34,18 +42,39 @@ object VideoMusicRemixerEngine {
         onProgress: (Float, String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
-            val trimmedUrl = videoUrl.trim()
-            if (trimmedUrl.isBlank()) {
+            val cleanUrl = VideoUrlUtils.unwrapAndCleanUrl(videoUrl)
+            if (cleanUrl.isBlank()) {
                 return@withContext Result.failure(IllegalArgumentException("Video URL cannot be empty"))
             }
 
             val remixDir = File(context.cacheDir, "video_remix").apply { if (!exists()) mkdirs() }
+
+            // Check if this is a MEGA.nz Cloud link
+            val megaInfo = VideoUrlUtils.extractMegaFileInfo(cleanUrl)
+            if (megaInfo != null) {
+                val outputFile = File(remixDir, "mega_${megaInfo.fileId}_${System.currentTimeMillis()}.mp4")
+                return@withContext downloadMegaVideo(outputFile, megaInfo, onProgress)
+            }
+
+            // Check if Google Drive or Dropbox
+            var downloadTargetUrl = cleanUrl
+            if (cleanUrl.contains("drive.google.com")) {
+                val driveIdRegex = """/d/([a-zA-Z0-9_-]+)""".toRegex()
+                val idMatch = driveIdRegex.find(cleanUrl)
+                val fileId = idMatch?.groupValues?.get(1)
+                if (fileId != null) {
+                    downloadTargetUrl = "https://drive.google.com/uc?export=download&id=$fileId&confirm=t"
+                }
+            } else if (cleanUrl.contains("dropbox.com")) {
+                downloadTargetUrl = cleanUrl.replace("dl=0", "dl=1")
+            }
+
             val outputFile = File(remixDir, "source_video_${System.currentTimeMillis()}.mp4")
 
-            onProgress(0.05f, "Connecting to video server: ${trimmedUrl.take(45)}...")
+            onProgress(0.05f, "Connecting to video server: ${downloadTargetUrl.take(45)}...")
 
             val request = Request.Builder()
-                .url(trimmedUrl)
+                .url(downloadTargetUrl)
                 .addHeader("User-Agent", "Mozilla/5.0 (Android; Mobile)")
                 .build()
 
@@ -90,6 +119,103 @@ object VideoMusicRemixerEngine {
             Result.success(outputFile)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to download video from $videoUrl", e)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun downloadMegaVideo(
+        outputFile: File,
+        megaInfo: MegaFileInfo,
+        onProgress: (Float, String) -> Unit
+    ): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            onProgress(0.05f, "Querying MEGA Cloud API for file ${megaInfo.fileId}...")
+
+            val jsonPayload = """[{"a":"g","g":1,"p":"${megaInfo.fileId}"}]"""
+            val body = jsonPayload.toRequestBody("application/json".toMediaType())
+            val apiRequest = Request.Builder()
+                .url("https://g.api.mega.co.nz/cs")
+                .post(body)
+                .build()
+
+            val apiResponse = okHttpClient.newCall(apiRequest).execute()
+            if (!apiResponse.isSuccessful) {
+                return@withContext Result.failure(IOException("MEGA API returned HTTP ${apiResponse.code}"))
+            }
+
+            val respStr = apiResponse.body?.string() ?: return@withContext Result.failure(IOException("Empty MEGA API response"))
+            val jsonArray = JSONArray(respStr)
+            if (jsonArray.length() == 0) {
+                return@withContext Result.failure(IOException("No file information found for MEGA ID ${megaInfo.fileId}"))
+            }
+
+            val item = jsonArray.optJSONObject(0)
+                ?: return@withContext Result.failure(IOException("Invalid MEGA file response or link expired"))
+
+            val downloadUrl = item.optString("g", "")
+            if (downloadUrl.isBlank()) {
+                return@withContext Result.failure(IOException("Direct download URL not available from MEGA for this file"))
+            }
+
+            val expectedSize = item.optLong("s", 0L)
+
+            val cryptoParams = VideoUrlUtils.deriveCryptoParams(megaInfo.fileKey)
+                ?: return@withContext Result.failure(IllegalArgumentException("Invalid or malformed MEGA encryption key"))
+
+            val (aesKey, iv) = cryptoParams
+            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(aesKey, "AES"), IvParameterSpec(iv))
+
+            onProgress(0.10f, "Connected to MEGA storage node. Starting secure decryption stream...")
+
+            val dlRequest = Request.Builder()
+                .url(downloadUrl)
+                .addHeader("User-Agent", "Mozilla/5.0 (Android; Mobile)")
+                .build()
+
+            val dlResponse = okHttpClient.newCall(dlRequest).execute()
+            if (!dlResponse.isSuccessful) {
+                return@withContext Result.failure(IOException("Failed to connect to MEGA storage: HTTP ${dlResponse.code}"))
+            }
+
+            val responseBody = dlResponse.body ?: return@withContext Result.failure(IOException("Empty body from MEGA storage"))
+            val totalBytesTarget = if (expectedSize > 0) expectedSize else responseBody.contentLength()
+
+            var totalBytesRead = 0L
+            val buffer = ByteArray(64 * 1024)
+
+            FileOutputStream(outputFile).use { fos ->
+                responseBody.byteStream().use { rawInput ->
+                    CipherInputStream(rawInput, cipher).use { cipherIn ->
+                        var bytesRead: Int
+                        while (cipherIn.read(buffer).also { bytesRead = it } != -1) {
+                            fos.write(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
+                            if (totalBytesTarget > 0) {
+                                val progress = (totalBytesRead.toFloat() / totalBytesTarget.toFloat()).coerceIn(0f, 1f)
+                                val mbRead = totalBytesRead / (1024 * 1024f)
+                                val mbTotal = totalBytesTarget / (1024 * 1024f)
+                                onProgress(
+                                    progress,
+                                    String.format("Downloading & decrypting MEGA video: %.1f MB / %.1f MB (%.0f%%)", mbRead, mbTotal, progress * 100)
+                                )
+                            } else {
+                                val mbRead = totalBytesRead / (1024 * 1024f)
+                                onProgress(0.5f, String.format("Downloading & decrypting MEGA video: %.1f MB", mbRead))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!outputFile.exists() || outputFile.length() == 0L) {
+                return@withContext Result.failure(IOException("Decrypted MEGA video file is empty"))
+            }
+
+            onProgress(1.0f, "MEGA video decrypted successfully (${totalBytesRead / (1024 * 1024)} MB)")
+            Result.success(outputFile)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed downloading MEGA video: ${e.message}", e)
             Result.failure(e)
         }
     }

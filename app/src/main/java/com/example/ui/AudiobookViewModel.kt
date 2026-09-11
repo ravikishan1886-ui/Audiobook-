@@ -1286,6 +1286,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun selectSampleVideo(sample: SampleVideoOption) {
         val durMs = when (sample.durationLabel) {
+            "04:30" -> 270000L
             "05:32" -> 332000L
             "09:56" -> 596000L
             "00:15" -> 15000L
@@ -1421,8 +1422,8 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     _remixState.update {
                         it.copy(
                             isProcessing = false,
-                            errorMessage = "Video fetch error: $errMsg. Please check the URL.",
-                            statusMessage = "Fetch failed",
+                            errorMessage = "Video fetch error: $errMsg. Please verify network connection and URL.",
+                            statusMessage = "Fetch failed: ${errMsg.take(30)}",
                             stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_RECEIVED to PipelineStepStatus.FAILED)
                         )
                     }

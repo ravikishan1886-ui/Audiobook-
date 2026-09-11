@@ -33,6 +33,12 @@ import com.example.data.model.VideoMusicRemixState
 
 val SAMPLE_VIDEOS = listOf(
     SampleVideoOption(
+        title = "Hiromi Higuruma 4K CC (MEGA)",
+        durationLabel = "04:30",
+        url = "https://mega.nz/file/5AFgkbCK#Ej-0k6UUgvXq5_bJifzk4bxPk4HLwElFXrVhiYyvwp4",
+        description = "Hiromi Higuruma 4K CC video from MEGA Cloud"
+    ),
+    SampleVideoOption(
         title = "Nefer 4K CC (MEGA Cloud)",
         durationLabel = "04:15",
         url = "https://www.google.com/url?sa=E&q=https%3A%2F%2Fmega.nz%2Ffile%2FZJkW0RCK%23x9fu65rOm-h1xvlsP0p3Iw84kJ-JhPWK9macoWQGohs",

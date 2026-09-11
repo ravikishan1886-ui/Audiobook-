@@ -28,9 +28,12 @@ object VideoMusicRemixerEngine {
     private const val TAG = "VideoMusicRemixer"
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     /**
@@ -148,7 +151,7 @@ object VideoMusicRemixerEngine {
         try {
             onProgress(0.05f, "Querying MEGA Cloud API for file ${megaInfo.fileId}...")
 
-            val jsonPayload = """[{"a":"g","g":1,"p":"${megaInfo.fileId}"}]"""
+            val jsonPayload = """[{"a":"g","g":1,"ssl":2,"p":"${megaInfo.fileId}"}]"""
             val body = jsonPayload.toRequestBody("application/json".toMediaType())
             val apiRequest = Request.Builder()
                 .url("https://g.api.mega.co.nz/cs")
@@ -166,12 +169,30 @@ object VideoMusicRemixerEngine {
                 return@withContext Result.failure(IOException("No file information found for MEGA ID ${megaInfo.fileId}"))
             }
 
+            // Handle integer error codes returned by MEGA (e.g. [-9], [-16], [-2])
+            val firstElement = jsonArray.opt(0)
+            if (firstElement is Number) {
+                val errCode = firstElement.toInt()
+                val reason = when (errCode) {
+                    -2 -> "Invalid arguments provided to MEGA API"
+                    -9 -> "File does not exist or was removed on MEGA"
+                    -11 -> "File access temporarily unavailable on MEGA"
+                    -16 -> "File blocked by MEGA terms of service"
+                    -17 -> "Bandwidth transfer quota exceeded on MEGA"
+                    else -> "MEGA error code $errCode"
+                }
+                return@withContext Result.failure(IOException(reason))
+            }
+
             val item = jsonArray.optJSONObject(0)
                 ?: return@withContext Result.failure(IOException("Invalid MEGA file response or link expired"))
 
-            val downloadUrl = item.optString("g", "")
+            var downloadUrl = item.optString("g", "")
             if (downloadUrl.isBlank()) {
                 return@withContext Result.failure(IOException("Direct download URL not available from MEGA for this file"))
+            }
+            if (downloadUrl.startsWith("http://")) {
+                downloadUrl = downloadUrl.replaceFirst("http://", "https://")
             }
 
             val expectedSize = item.optLong("s", 0L)

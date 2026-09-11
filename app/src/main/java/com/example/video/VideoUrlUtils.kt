@@ -42,8 +42,11 @@ object VideoUrlUtils {
     private const val TAG = "VideoUrlUtils"
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     /**
@@ -200,7 +203,7 @@ object VideoUrlUtils {
      */
     suspend fun fetchMegaMetadata(fileId: String, fileKey: String): Pair<String?, Long?> = withContext(Dispatchers.IO) {
         try {
-            val jsonPayload = """[{"a":"g","g":1,"p":"$fileId"}]"""
+            val jsonPayload = """[{"a":"g","g":1,"ssl":2,"p":"$fileId"}]"""
             val body = jsonPayload.toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
                 .url("https://g.api.mega.co.nz/cs")
@@ -213,6 +216,9 @@ object VideoUrlUtils {
             val respBody = response.body?.string() ?: return@withContext Pair(null, null)
             val jsonArray = JSONArray(respBody)
             if (jsonArray.length() == 0) return@withContext Pair(null, null)
+
+            // If MEGA returned an error code (e.g. [-9])
+            if (jsonArray.opt(0) is Number) return@withContext Pair(null, null)
 
             val item = jsonArray.optJSONObject(0) ?: return@withContext Pair(null, null)
             val size = item.optLong("s", 0L)

@@ -54,6 +54,21 @@ class VideoUrlUtilsTest {
     }
 
     @Test
+    fun extractMegaFileInfo_extractsUserHigurumaUrl() {
+        val userUrl = "https://mega.nz/file/5AFgkbCK#Ej-0k6UUgvXq5_bJifzk4bxPk4HLwElFXrVhiYyvwp4"
+        val megaInfo = VideoUrlUtils.extractMegaFileInfo(userUrl)
+        assertNotNull(megaInfo)
+        assertEquals("5AFgkbCK", megaInfo?.fileId)
+        assertEquals("Ej-0k6UUgvXq5_bJifzk4bxPk4HLwElFXrVhiYyvwp4", megaInfo?.fileKey)
+
+        val cryptoParams = VideoUrlUtils.deriveCryptoParams(megaInfo!!.fileKey)
+        assertNotNull(cryptoParams)
+        val (aesKey, iv) = cryptoParams!!
+        assertEquals(16, aesKey.size)
+        assertEquals(16, iv.size)
+    }
+
+    @Test
     fun resolveSource_identifiesMegaAndRedirect() {
         val resolved = VideoUrlUtils.resolveSource(userProvidedGoogleRedirectUrl)
         assertTrue(resolved.isGoogleRedirect)

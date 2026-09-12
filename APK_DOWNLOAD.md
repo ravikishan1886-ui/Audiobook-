@@ -10,8 +10,8 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~23 MB (23,257,398 bytes) |
-| **SHA-256 Checksum** | `96ad91f421c1ae83ce552483e9b53a67034a8da9c7d6c2d2ba0ba324ed13f179` |
+| **File Size** | ~22 MB |
+| **SHA-256 Checksum** | `b161f6156b51bfcf3c0e6ec459e4a42ceb357dacb28dd66304f6a05d3a391ce8` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -19,13 +19,19 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🎵 100% Exact Music Preservation (No Music Alterations)
-- **Zero Pitch & Speed Alteration**: Previously, 48kHz audio files were resampled as 44.1kHz, causing pitch drops and slowed playback. The audio engine now preserves the exact native sample rate (e.g. 48,000 Hz, 44,100 Hz) and channel count (Mono / Stereo) directly from the source.
-- **Zero Dropped Audio Buffers**: The hardware AAC encoder initialization previously dropped initial buffers before the container started, cutting off the first ~2.5 seconds of the song. All initial audio packets from sample 0 are now buffered and flushed into the container so the music starts from the exact first note.
-- **WAV RIFF Chunk-Safe Parsing**: Audio headers are parsed through standard RIFF chunk scanning to locate the exact `data` chunk offset, eliminating static or byte misalignment.
-- **"Keep Original Video Audio" Option**: Added a dedicated **🎵 Original Video Audio** preset (enabled by default) so users who remix videos can preserve the video's original soundtrack without replacing it.
+### 1. 🎵 YouTube Music URL Upload
+- **Direct YouTube Music Extraction**: Enter or paste any YouTube or YouTube Music link (e.g. `https://www.youtube.com/watch?v=...`, `https://youtu.be/...`, or `https://music.youtube.com/watch?v=...`).
+- **High-Fidelity Audio Stream Extraction**: Decodes the YouTube audio stream directly into pristine PCM audio using hardware `MediaCodec` and mixes it with your video.
+- **One-Tap Presets & Fast Paste**: Quick sample chips for instant testing plus clipboard paste and clear controls.
+- **Automatic Metadata Detection**: Displays the YouTube track title, channel/artist name, and duration directly in the remix audio card.
 
-### 2. 🎬 Pure Video & Music Remix (Zero Narration)
+### 2. 🎶 100% Exact Music Preservation (No Music Alterations)
+- **Zero Pitch & Speed Alteration**: Preserves the exact native sample rate (e.g. 48,000 Hz, 44,100 Hz) and channel count (Mono / Stereo) directly from the source.
+- **Zero Dropped Audio Buffers**: Audio packets from sample 0 are buffered and flushed into the container so the music starts cleanly from the first note.
+- **WAV RIFF Chunk-Safe Parsing**: Standard RIFF chunk scanning to locate the exact `data` chunk offset without static or misalignment.
+- **"Keep Original Video Audio" Option**: Dedicated **🎵 Original Video Audio** preset to preserve the video's original soundtrack.
+
+### 3. 🎬 Pure Video & Music Remix (Zero Narration)
 - **Direct Video Remixing**: When a user adds a video URL and music in Video Remix, the app fetches the video and directly adds the music soundtrack without generating or attaching any audiobook narration, voice synthesis, or book cover overlays.
 - **Interleaved Media Muxing**: Hardware `MediaMuxer` pipeline with PTS-synchronized interleaving, ensuring video and audio packets write in lockstep without container crashes.
 

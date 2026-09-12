@@ -5,12 +5,14 @@ Download the compiled Android application package below:
 ### ⬇️ **[Download `app-debug.apk` (Raw)](./app-debug.apk?raw=true)**
 
 - **File**: `app-debug.apk`
-- **Size**: ~23 MB (23,257,398 bytes)
-- **SHA-256**: `96ad91f421c1ae83ce552483e9b53a67034a8da9c7d6c2d2ba0ba324ed13f179`
+- **Size**: ~22 MB
+- **SHA-256**: `b161f6156b51bfcf3c0e6ec459e4a42ceb357dacb28dd66304f6a05d3a391ce8`
 - **Minimum Android**: Android 7.0 (API 24)
 - **Target Android**: Android 14+ / 16 (API 36)
 
 ### Included Features:
+- 🎵 YouTube Music URL Upload: Paste any YouTube / YouTube Music URL to extract and remix the pristine audio track directly into your video
+- Quick sample YouTube Music chips (Rick Astley, Lofi Chill Beats, Retro Synthwave) + 1-tap paste button
 - Pure Video-Music Remix: URL + Music with zero narration synthesis or book cover overlays
 - 100% Music Fidelity Preservation: Exact native sample rate (e.g. 48kHz / 44.1kHz) and channel mapping
 - Zero dropped audio buffers (song intro preserved from sample 0 without pitch or tempo alterations)

@@ -1325,6 +1325,39 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 youtubeMusicError = null
             )
         }
+        val trimmed = url.trim()
+        val videoId = YouTubeAudioExtractor.extractYouTubeVideoId(trimmed)
+        if (videoId != null) {
+            viewModelScope.launch {
+                _remixState.update { it.copy(isResolvingYouTubeSource = true) }
+                val resolved = YouTubeAudioExtractor.resolveSourceInfo(trimmed)
+                _remixState.update { current ->
+                    current.copy(
+                        isResolvingYouTubeSource = false,
+                        resolvedYouTubeSource = resolved,
+                        youtubeMusicTitle = resolved?.title ?: current.youtubeMusicTitle,
+                        youtubeMusicAuthor = resolved?.author ?: current.youtubeMusicAuthor,
+                        youtubeMusicThumbnailUrl = resolved?.thumbnailUrl ?: current.youtubeMusicThumbnailUrl
+                    )
+                }
+            }
+        } else {
+            _remixState.update {
+                it.copy(
+                    isResolvingYouTubeSource = false,
+                    resolvedYouTubeSource = null
+                )
+            }
+        }
+    }
+
+    fun selectResolvedYouTubeMusic() {
+        val resolved = _remixState.value.resolvedYouTubeSource
+        if (resolved != null) {
+            fetchYouTubeMusic(resolved.sourceUrl)
+        } else {
+            fetchYouTubeMusic(null)
+        }
     }
 
     fun fetchYouTubeMusic(youtubeUrl: String? = null) {

@@ -28,9 +28,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import coil.compose.AsyncImage
 import com.example.data.model.SampleMusicOption
 import com.example.data.model.SampleVideoOption
 import com.example.data.model.VideoMusicRemixState
+import com.example.data.model.YouTubeSourceInfo
 import com.example.video.YouTubeAudioExtractor
 
 val SAMPLE_VIDEOS = listOf(
@@ -102,6 +107,12 @@ data class SampleYouTubeMusicOption(
 
 val SAMPLE_YOUTUBE_MUSICS = listOf(
     SampleYouTubeMusicOption(
+        title = "Paijo (YouTube Shorts Audio)",
+        artist = "Zaskia Gotik - Topic",
+        url = "https://youtube.com/source/KheSUT2stiM/shorts",
+        durationLabel = "00:58"
+    ),
+    SampleYouTubeMusicOption(
         title = "Dark Iruma (Dancin Krono Remix)",
         artist = "Kiki Baskerville / Krono",
         url = "https://youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk",
@@ -146,6 +157,7 @@ fun VideoRemixInputSection(
     onDirectRemixNow: () -> Unit = {},
     onYouTubeMusicUrlChange: (String) -> Unit = {},
     onFetchYouTubeMusic: (String?) -> Unit = {},
+    onUseThisMusic: () -> Unit = { onFetchYouTubeMusic(null) },
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -441,45 +453,213 @@ fun VideoRemixInputSection(
                             }
                         )
 
-                        // Live URL Detection & Validation Badges
+                        // Live URL Detection & Validation
                         val urlTrimmed = remixState.youtubeMusicUrl.trim()
                         val detectedVideoId: String? = remember(urlTrimmed) {
                             YouTubeAudioExtractor.extractYouTubeVideoId(urlTrimmed)
+                        }
+                        val isShortsSource = remember(urlTrimmed) {
+                            YouTubeAudioExtractor.isShortsSourceUrl(urlTrimmed)
                         }
                         val isDirectPublicAudio = remember(urlTrimmed, detectedVideoId) {
                             detectedVideoId == null && (urlTrimmed.startsWith("http://", ignoreCase = true) || urlTrimmed.startsWith("https://", ignoreCase = true))
                         }
 
                         if (detectedVideoId != null) {
-                            Surface(
-                                color = Color(0xFFE8F5E9),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                            val resolved = remixState.resolvedYouTubeSource
+                            val musicTitle = resolved?.title ?: remixState.youtubeMusicTitle ?: if (remixState.isResolvingYouTubeSource) "Resolving music track..." else "YouTube Track ($detectedVideoId)"
+                            val musicAuthor = resolved?.author ?: remixState.youtubeMusicAuthor ?: if (remixState.isResolvingYouTubeSource) "Resolving artist..." else "YouTube Artist / Channel"
+                            val thumbUrl = resolved?.thumbnailUrl ?: remixState.youtubeMusicThumbnailUrl ?: "https://i.ytimg.com/vi/$detectedVideoId/hqdefault.jpg"
+                            val sourceRefUrl = resolved?.sourceUrl ?: if (isShortsSource) "https://youtube.com/source/$detectedVideoId/shorts" else "https://youtu.be/$detectedVideoId"
+                            val isMusicActive = (remixState.localMusicFile != null || remixState.musicFileName.isNotBlank()) &&
+                                (remixState.musicFileName.contains(musicTitle, ignoreCase = true) || (remixState.youtubeMusicTitle != null && remixState.youtubeMusicTitle == musicTitle))
+
+                            Card(
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                border = BorderStroke(1.dp, if (isMusicActive) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("resolved_youtube_source_card")
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Filled.CheckCircle,
-                                        contentDescription = null,
-                                        tint = Color(0xFF2E7D32),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "YouTube URL Accepted ✓",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF1B5E20)
+                                    // URL Parser detection tag
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Color(0xFF2E7D32),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = if (isShortsSource) "Detected /source/{ID}/shorts" else "YouTube Audio Source",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF1B5E20)
+                                            )
+                                        }
+                                        Surface(
+                                            color = Color(0xFFE8F5E9),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "Extract: $detectedVideoId",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF2E7D32),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Resolved source/music information
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 🖼️ Thumbnail
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 96.dp, height = 72.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color.Black),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            AsyncImage(
+                                                model = thumbUrl,
+                                                contentDescription = "YouTube Music Thumbnail",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.Black.copy(alpha = 0.65f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.MusicNote,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+
+                                        // Source Information Details
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            // 🎵 Music title
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text("🎵", fontSize = 13.sp)
+                                                Text(
+                                                    text = musicTitle,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+
+                                            // 👤 Artist/channel
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text("👤", fontSize = 12.sp)
+                                                Text(
+                                                    text = musicAuthor,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+
+                                            // 🔗 YouTube music/source reference
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text("🔗", fontSize = 11.sp)
+                                                Text(
+                                                    text = sourceRefUrl.removePrefix("https://"),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    textDecoration = TextDecoration.Underline,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+
+                                            if (remixState.isResolvingYouTubeSource) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.padding(top = 2.dp)
+                                                ) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.5.dp)
+                                                    Text(
+                                                        text = "Resolving YouTube metadata...",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.outline,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Action: User selects "Use this music"
+                                    Button(
+                                        onClick = { onUseThisMusic() },
+                                        enabled = !remixState.isFetchingYouTubeMusic,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("use_this_music_button"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isMusicActive) Color(0xFF2E7D32) else Color(0xFFCC0000),
+                                            contentColor = Color.White
                                         )
-                                        Text(
-                                            text = "Video ID: $detectedVideoId (Ready to extract music)",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFF2E7D32),
-                                            fontSize = 10.sp
-                                        )
+                                    ) {
+                                        if (remixState.isFetchingYouTubeMusic) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Loading & Preparing Music...", fontWeight = FontWeight.Bold)
+                                        } else if (isMusicActive) {
+                                            Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("✓ Using this music", fontWeight = FontWeight.Bold)
+                                        } else {
+                                            Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Use this music", fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -549,31 +729,33 @@ fun VideoRemixInputSection(
                             }
                         }
 
-                        // Fetch YouTube / Public Music Button
-                        Button(
-                            onClick = { onFetchYouTubeMusic(null) },
-                            enabled = remixState.youtubeMusicUrl.isNotBlank() && !remixState.isFetchingYouTubeMusic,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("fetch_youtube_music_button"),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFCC0000),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            if (remixState.isFetchingYouTubeMusic) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
+                        // Fetch Public Music Button (shown for direct audio streams when no YouTube card is active)
+                        if (detectedVideoId == null) {
+                            Button(
+                                onClick = { onFetchYouTubeMusic(null) },
+                                enabled = remixState.youtubeMusicUrl.isNotBlank() && !remixState.isFetchingYouTubeMusic,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("fetch_youtube_music_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFCC0000),
+                                    contentColor = Color.White
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Downloading Music...", fontWeight = FontWeight.Medium)
-                            } else {
-                                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Fetch & Use Music Track", fontWeight = FontWeight.Medium)
+                            ) {
+                                if (remixState.isFetchingYouTubeMusic) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Downloading Music...", fontWeight = FontWeight.Medium)
+                                } else {
+                                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Fetch & Use Music Track", fontWeight = FontWeight.Medium)
+                                }
                             }
                         }
 

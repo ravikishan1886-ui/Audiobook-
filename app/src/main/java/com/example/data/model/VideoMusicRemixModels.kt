@@ -42,6 +42,15 @@ data class SampleMusicOption(
     val genre: String
 )
 
+data class YouTubeSourceInfo(
+    val videoId: String,
+    val title: String,
+    val author: String,
+    val thumbnailUrl: String,
+    val sourceUrl: String,
+    val isShortsSource: Boolean = false
+)
+
 data class VideoMusicRemixState(
     val currentView: RemixViewMode = RemixViewMode.INPUT,
     val videoUrl: String = "",
@@ -53,6 +62,9 @@ data class VideoMusicRemixState(
     val youtubeMusicError: String? = null,
     val youtubeMusicTitle: String? = null,
     val youtubeMusicAuthor: String? = null,
+    val youtubeMusicThumbnailUrl: String? = null,
+    val isResolvingYouTubeSource: Boolean = false,
+    val resolvedYouTubeSource: YouTubeSourceInfo? = null,
     val downloadedVideoFile: File? = null,
     val renderedMp4File: File? = null,
 

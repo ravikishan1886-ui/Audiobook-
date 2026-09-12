@@ -3,6 +3,7 @@ package com.example.video
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.example.data.model.YouTubeSourceInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -35,7 +36,14 @@ data class YouTubeAudioResult(
     val title: String,
     val author: String,
     val durationMs: Long,
-    val pcmWavFile: File
+    val pcmWavFile: File,
+    val thumbnailUrl: String? = null
+)
+
+data class YouTubeOEmbedMetadata(
+    val title: String,
+    val author: String,
+    val thumbnailUrl: String
 )
 
 object YouTubeAudioExtractor {
@@ -51,6 +59,7 @@ object YouTubeAudioExtractor {
 
     /**
      * Extracts YouTube Video ID from any standard, shortened, Shorts, or mobile YouTube URL:
+     * - https://youtube.com/source/KheSUT2stiM/shorts?si=... (/source/{ID}/shorts)
      * - https://youtube.com/shorts/mN0EiTdNmHs
      * - https://youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk
      * - https://www.youtube.com/watch?v=VIDEO_ID
@@ -87,6 +96,14 @@ object YouTubeAudioExtractor {
                     return vParam
                 }
                 val segments = uri.pathSegments ?: emptyList()
+                // Explicitly detect /source/{ID}/shorts pattern
+                val sourceIdx = segments.indexOfFirst { it.equals("source", ignoreCase = true) }
+                if (sourceIdx >= 0 && sourceIdx + 1 < segments.size) {
+                    val candidate = segments[sourceIdx + 1].trim()
+                    if (candidate.matches("^[a-zA-Z0-9_-]{11}$".toRegex())) {
+                        return candidate
+                    }
+                }
                 val markerIdx = segments.indexOfFirst { it == "shorts" || it == "embed" || it == "v" || it == "live" }
                 if (markerIdx >= 0 && markerIdx + 1 < segments.size) {
                     val candidate = segments[markerIdx + 1].trim()
@@ -99,6 +116,7 @@ object YouTubeAudioExtractor {
 
         // 2. Comprehensive Regex patterns for fallback
         val patterns = listOf(
+            """youtube\.com\/source\/([a-zA-Z0-9_-]{11})""".toRegex(RegexOption.IGNORE_CASE),
             """youtu\.be\/([a-zA-Z0-9_-]{11})""".toRegex(RegexOption.IGNORE_CASE),
             """[?&]v=([a-zA-Z0-9_-]{11})""".toRegex(RegexOption.IGNORE_CASE),
             """youtube\.com\/(?:embed|shorts|v|live)\/([a-zA-Z0-9_-]{11})""".toRegex(RegexOption.IGNORE_CASE),
@@ -115,8 +133,17 @@ object YouTubeAudioExtractor {
     }
 
     /**
+     * Checks if a URL specifically targets a YouTube Shorts audio source reference:
+     * e.g. https://youtube.com/source/KheSUT2stiM/shorts?si=...
+     */
+    fun isShortsSourceUrl(rawUrl: String): Boolean {
+        val clean = VideoUrlUtils.unwrapAndCleanUrl(rawUrl).trim()
+        return clean.contains("/source/", ignoreCase = true)
+    }
+
+    /**
      * Checks if a given input string is a valid music URL:
-     * Either a YouTube link (shorts, watch, youtu.be) OR a direct public audio stream/file URL.
+     * Either a YouTube link (shorts, source, watch, youtu.be) OR a direct public audio stream/file URL.
      */
     fun isPublicMusicUrl(rawUrl: String): Boolean {
         val clean = VideoUrlUtils.unwrapAndCleanUrl(rawUrl).trim()
@@ -126,9 +153,10 @@ object YouTubeAudioExtractor {
     }
 
     /**
-     * Queries official YouTube oEmbed API to get true video title and channel name.
+     * Queries official YouTube oEmbed API to get true video title, author, and thumbnail URL.
      */
-    private fun fetchOEmbedMetadata(videoId: String): Pair<String, String>? {
+    fun fetchOEmbedMetadata(videoId: String): YouTubeOEmbedMetadata {
+        val defaultThumb = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
         return try {
             val oembedUrl = "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=$videoId&format=json"
             val req = Request.Builder()
@@ -139,16 +167,48 @@ object YouTubeAudioExtractor {
             if (res.isSuccessful) {
                 val body = res.body?.string() ?: ""
                 val json = JSONObject(body)
-                val title = json.optString("title", "").takeIf { it.isNotBlank() }
-                val author = json.optString("author_name", "").takeIf { it.isNotBlank() }
-                if (title != null) {
-                    Pair(title, author ?: "YouTube Artist")
-                } else null
-            } else null
+                val title = json.optString("title", "").takeIf { it.isNotBlank() } ?: "YouTube Music Track"
+                val author = json.optString("author_name", "").takeIf { it.isNotBlank() } ?: "YouTube Artist"
+                val thumb = json.optString("thumbnail_url", "").takeIf { it.isNotBlank() } ?: defaultThumb
+                YouTubeOEmbedMetadata(title, author, thumb)
+            } else {
+                YouTubeOEmbedMetadata("YouTube Audio Track", "YouTube Artist", defaultThumb)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "oEmbed metadata fetch failed for $videoId: ${e.message}")
-            null
+            YouTubeOEmbedMetadata("YouTube Audio Track", "YouTube Artist", defaultThumb)
         }
+    }
+
+    /**
+     * Resolves the full YouTube source / music information for display in the UI:
+     * - 🎵 Music title
+     * - 👤 Artist / channel
+     * - 🖼️ Thumbnail URL
+     * - 🔗 YouTube music / source reference
+     */
+    suspend fun resolveSourceInfo(rawUrl: String): YouTubeSourceInfo? = withContext(Dispatchers.IO) {
+        val videoId = extractYouTubeVideoId(rawUrl) ?: return@withContext null
+        val clean = VideoUrlUtils.unwrapAndCleanUrl(rawUrl).trim()
+        val isShorts = isShortsSourceUrl(clean) || clean.contains("/shorts", ignoreCase = true)
+        val oembed = fetchOEmbedMetadata(videoId)
+
+        val referenceUrl = if (clean.contains("/source/", ignoreCase = true)) {
+            "https://youtube.com/source/$videoId/shorts"
+        } else if (clean.contains("/shorts", ignoreCase = true)) {
+            "https://youtube.com/shorts/$videoId"
+        } else {
+            "https://youtu.be/$videoId"
+        }
+
+        YouTubeSourceInfo(
+            videoId = videoId,
+            title = oembed.title,
+            author = oembed.author,
+            thumbnailUrl = oembed.thumbnailUrl,
+            sourceUrl = referenceUrl,
+            isShortsSource = isShorts
+        )
     }
 
     /**
@@ -159,8 +219,8 @@ object YouTubeAudioExtractor {
         try {
             // First, fetch accurate metadata via oEmbed
             val oembed = fetchOEmbedMetadata(videoId)
-            var videoTitle = oembed?.first ?: "YouTube Music Track"
-            var videoAuthor = oembed?.second ?: "YouTube Creator"
+            var videoTitle = oembed.title
+            var videoAuthor = oembed.author
             var durationSeconds = 198L // Default ~3:18
 
             // Tier 1: YouTube Innertube ANDROID_VR Client

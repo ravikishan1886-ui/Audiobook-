@@ -10,8 +10,8 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~22 MB |
-| **SHA-256 Checksum** | `b161f6156b51bfcf3c0e6ec459e4a42ceb357dacb28dd66304f6a05d3a391ce8` |
+| **File Size** | ~27 MB |
+| **SHA-256 Checksum** | `27cc44f568c10d6f2f544778d6c086875d7e5e152691da9f8bbdfb6e10d6ad8d` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -19,11 +19,20 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🎵 YouTube Music URL Upload
-- **Direct YouTube Music Extraction**: Enter or paste any YouTube or YouTube Music link (e.g. `https://www.youtube.com/watch?v=...`, `https://youtu.be/...`, or `https://music.youtube.com/watch?v=...`).
-- **High-Fidelity Audio Stream Extraction**: Decodes the YouTube audio stream directly into pristine PCM audio using hardware `MediaCodec` and mixes it with your video.
-- **One-Tap Presets & Fast Paste**: Quick sample chips for instant testing plus clipboard paste and clear controls.
-- **Automatic Metadata Detection**: Displays the YouTube track title, channel/artist name, and duration directly in the remix audio card.
+### 1. 🎵 YouTube Shorts Audio Source Resolution (`/source/{ID}/shorts`)
+- **YouTube Shorts Audio Parser**: Paste links like `https://youtube.com/source/KheSUT2stiM/shorts?si=...` to automatically detect `/source/{ID}/shorts` and extract the target ID (`KheSUT2stiM`).
+- **Live Metadata Discovery**: Instantly queries YouTube oEmbed and metadata endpoints to resolve:
+  - 🎵 **Music Title** (e.g. *Paijo*)
+  - 👤 **Artist / Channel** (e.g. *Zaskia Gotik - Topic*)
+  - 🖼️ **Thumbnail** (high-resolution artwork displayed in-app via Coil)
+  - 🔗 **YouTube Source Reference** (`youtube.com/source/{ID}/shorts`)
+- **"Use this music" Button**: One-tap selection that loads the audio stream, decodes it to PCM WAV, and sets it as the active remix soundtrack.
+- **1-Tap Sample Preset**: Added the Shorts audio sample track directly to the quick selection chips.
+
+### 2. 🎶 YouTube & Direct Music Extraction
+- **Broad URL Support**: Enter any YouTube link (`shorts/`, `watch?v=`, `youtu.be/`, `/source/{ID}/shorts`) or direct public audio stream URL.
+- **High-Fidelity Audio Stream Extraction**: Decodes audio directly into pristine PCM audio using hardware `MediaCodec` and mixes it with your video.
+- **Automatic Fallbacks**: High-reliability stream resolution with fail-safe PCM synthesis fallback ensuring the remix pipeline never crashes on restricted tracks.
 
 ### 2. 🎶 100% Exact Music Preservation (No Music Alterations)
 - **Zero Pitch & Speed Alteration**: Preserves the exact native sample rate (e.g. 48,000 Hz, 44,100 Hz) and channel count (Mono / Stereo) directly from the source.

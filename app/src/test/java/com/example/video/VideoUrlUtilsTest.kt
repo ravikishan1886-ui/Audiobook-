@@ -77,4 +77,33 @@ class VideoUrlUtilsTest {
         assertTrue(resolved.displayBadge.contains("Google Redirect Unwrapped"))
         assertTrue(resolved.displayBadge.contains("MEGA"))
     }
+
+    @Test
+    fun extractYouTubeVideoId_acceptsUserRequestedUrlWithSiTracking() {
+        val userUrl = "https://youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk"
+        val videoId = YouTubeAudioExtractor.extractYouTubeVideoId(userUrl)
+        assertEquals("FLKvBcLv-AY", videoId)
+    }
+
+    @Test
+    fun extractYouTubeVideoId_acceptsVariousFormats() {
+        // Standard watch URL with tracking param
+        assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("https://www.youtube.com/watch?v=FLKvBcLv-AY&si=ZVaWzq5bfVcexDWk"))
+        // Shortened URL without protocol
+        assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk"))
+        // YouTube Shorts URL
+        assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("https://youtube.com/shorts/FLKvBcLv-AY"))
+        // Direct video ID
+        assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("FLKvBcLv-AY"))
+    }
+
+    @Test
+    fun generateHighFidelityRemixWav_createsValidPcmWav() {
+        val tempFile = java.io.File.createTempFile("test_remix_", ".wav")
+        tempFile.deleteOnExit()
+        val success = YouTubeAudioExtractor.generateHighFidelityRemixWav(tempFile, durationSeconds = 3, sampleRate = 44100, bpm = 128.0)
+        assertTrue(success)
+        assertTrue(tempFile.exists())
+        assertTrue(tempFile.length() > 44) // Contains canonical 44-byte WAV header and PCM audio
+    }
 }

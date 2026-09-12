@@ -1526,8 +1526,8 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 val musicFile: File = if (state.localMusicFile != null && state.localMusicFile.exists() && state.localMusicFile.length() > 44) {
                     _remixState.update { it.copy(statusMessage = "Using prepared music soundtrack...") }
                     state.localMusicFile
-                } else if (state.youtubeMusicUrl.isNotBlank() && state.musicFileUri == null) {
-                    _remixState.update { it.copy(statusMessage = "Downloading audio stream from YouTube...") }
+                } else if (state.youtubeMusicUrl.isNotBlank()) {
+                    _remixState.update { it.copy(statusMessage = "Loading YouTube music track...") }
                     val ytResult = YouTubeAudioExtractor.fetchAndDecodeYouTubeAudio(
                         context = context,
                         youtubeUrl = state.youtubeMusicUrl,

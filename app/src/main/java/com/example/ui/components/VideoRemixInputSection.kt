@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.SampleMusicOption
 import com.example.data.model.SampleVideoOption
 import com.example.data.model.VideoMusicRemixState
+import com.example.video.YouTubeAudioExtractor
 
 val SAMPLE_VIDEOS = listOf(
     SampleVideoOption(
@@ -100,6 +101,12 @@ data class SampleYouTubeMusicOption(
 )
 
 val SAMPLE_YOUTUBE_MUSICS = listOf(
+    SampleYouTubeMusicOption(
+        title = "Dark Iruma (Dancin Krono Remix)",
+        artist = "Kiki Baskerville / Krono",
+        url = "https://youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk",
+        durationLabel = "03:18"
+    ),
     SampleYouTubeMusicOption(
         title = "Never Gonna Give You Up",
         artist = "Rick Astley",
@@ -397,7 +404,7 @@ fun VideoRemixInputSection(
                                 .testTag("youtube_music_url_input"),
                             placeholder = {
                                 Text(
-                                    "https://www.youtube.com/watch?v=... or https://youtu.be/...",
+                                    "e.g. https://youtu.be/FLKvBcLv-AY?si=... or watch?v=...",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 12.sp
                                 )
@@ -427,6 +434,46 @@ fun VideoRemixInputSection(
                                 }
                             }
                         )
+
+                        // Live YouTube URL Detection & Validation Badge
+                        val detectedVideoId: String? = remember(remixState.youtubeMusicUrl) {
+                            YouTubeAudioExtractor.extractYouTubeVideoId(remixState.youtubeMusicUrl)
+                        }
+
+                        if (detectedVideoId != null) {
+                            Surface(
+                                color = Color(0xFFE8F5E9),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2E7D32),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "YouTube URL Accepted ✓",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF1B5E20)
+                                        )
+                                        Text(
+                                            text = "Video ID: $detectedVideoId (Ready to extract music)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF2E7D32),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         // Sample YouTube Music Quick Presets
                         Text(

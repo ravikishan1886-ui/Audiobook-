@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -91,6 +92,34 @@ val SAMPLE_MUSICS = listOf(
     )
 )
 
+data class SampleYouTubeMusicOption(
+    val title: String,
+    val artist: String,
+    val url: String,
+    val durationLabel: String
+)
+
+val SAMPLE_YOUTUBE_MUSICS = listOf(
+    SampleYouTubeMusicOption(
+        title = "Never Gonna Give You Up",
+        artist = "Rick Astley",
+        url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        durationLabel = "03:33"
+    ),
+    SampleYouTubeMusicOption(
+        title = "Lofi Hip Hop Chill Beats",
+        artist = "Lofi Girl",
+        url = "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+        durationLabel = "02:45"
+    ),
+    SampleYouTubeMusicOption(
+        title = "Retro Synthwave Sunset",
+        artist = "Synthwave",
+        url = "https://www.youtube.com/watch?v=4xDzrJKXOOY",
+        durationLabel = "03:12"
+    )
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoRemixInputSection(
@@ -102,6 +131,8 @@ fun VideoRemixInputSection(
     onRightsConfirmedChange: (Boolean) -> Unit,
     onNextToPreview: () -> Unit,
     onDirectRemixNow: () -> Unit = {},
+    onYouTubeMusicUrlChange: (String) -> Unit = {},
+    onFetchYouTubeMusic: (String?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -289,40 +320,245 @@ fun VideoRemixInputSection(
                 }
             }
 
-            // 2. Upload Music/Audio File
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "2. Upload Music / Audio File",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
+            // 2. Upload Music / YouTube Music URL
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Button(
-                        onClick = { audioPickerLauncher.launch("audio/*") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("upload_music_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Text(
+                        text = "2. Upload Music or YouTube Music URL",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        color = Color(0xFFFF0000).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (remixState.musicFileName.isNotBlank()) "Replace Audio" else "Choose Audio File",
-                            fontWeight = FontWeight.Medium
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.PlayCircle,
+                                contentDescription = null,
+                                tint = Color(0xFFFF0000),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "YouTube Music Supported",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF0000)
+                            )
+                        }
                     }
                 }
 
+                // YouTube Music URL Input Card
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.MusicVideo,
+                                contentDescription = null,
+                                tint = Color(0xFFFF0000),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Paste YouTube Video or Music URL:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = remixState.youtubeMusicUrl,
+                            onValueChange = onYouTubeMusicUrlChange,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("youtube_music_url_input"),
+                            placeholder = {
+                                Text(
+                                    "https://www.youtube.com/watch?v=... or https://youtu.be/...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            trailingIcon = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (remixState.youtubeMusicUrl.isNotBlank()) {
+                                        IconButton(
+                                            onClick = { onYouTubeMusicUrlChange("") },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.getText()?.text?.let { clipText ->
+                                                if (clipText.isNotBlank()) onYouTubeMusicUrlChange(clipText.trim())
+                                            }
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Filled.ContentPaste, contentDescription = "Paste", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        )
+
+                        // Sample YouTube Music Quick Presets
+                        Text(
+                            text = "Quick Sample YouTube Music Links:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SAMPLE_YOUTUBE_MUSICS.forEach { sampleYt ->
+                                val isSelected = remixState.youtubeMusicUrl == sampleYt.url
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        onYouTubeMusicUrlChange(sampleYt.url)
+                                        onFetchYouTubeMusic(sampleYt.url)
+                                    },
+                                    label = {
+                                        Text(
+                                            "▶ ${sampleYt.title} (${sampleYt.durationLabel})",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+
+                        // Fetch YouTube Music Button
+                        Button(
+                            onClick = { onFetchYouTubeMusic(null) },
+                            enabled = remixState.youtubeMusicUrl.isNotBlank() && !remixState.isFetchingYouTubeMusic,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("fetch_youtube_music_button"),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFCC0000),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            if (remixState.isFetchingYouTubeMusic) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Downloading YouTube Music...", fontWeight = FontWeight.Medium)
+                            } else {
+                                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Fetch & Use YouTube Music", fontWeight = FontWeight.Medium)
+                            }
+                        }
+
+                        // YouTube Music Error display if any
+                        if (remixState.youtubeMusicError != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.ErrorOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = remixState.youtubeMusicError ?: "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Divider OR
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "OR CHOOSE OTHER AUDIO",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+
+                // Choose local audio file button
+                Button(
+                    onClick = { audioPickerLauncher.launch("audio/*") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("upload_music_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (remixState.musicFileName.isNotBlank() && !remixState.musicFileName.contains("YouTube")) "Replace Local Audio File" else "Upload Local Audio File (MP3, WAV, AAC)",
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Active Audio Status Card
                 if (remixState.musicFileName.isNotBlank()) {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        color = if (remixState.musicFileName.contains("YouTube")) Color(0xFFFF0000).copy(alpha = 0.08f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         shape = RoundedCornerShape(10.dp),
+                        border = if (remixState.musicFileName.contains("YouTube")) BorderStroke(1.dp, Color(0xFFFF0000).copy(alpha = 0.3f)) else null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -336,7 +572,12 @@ fun VideoRemixInputSection(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Icon(Icons.Filled.Audiotrack, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                Icon(
+                                    if (remixState.musicFileName.contains("YouTube")) Icons.Filled.PlayCircle else Icons.Filled.Audiotrack,
+                                    contentDescription = null,
+                                    tint = if (remixState.musicFileName.contains("YouTube")) Color(0xFFFF0000) else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
                                 Column {
                                     Text(
                                         text = remixState.musicFileName,
@@ -345,20 +586,26 @@ fun VideoRemixInputSection(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "Duration: ${remixState.formattedMusicDuration}",
+                                        text = "Duration: ${remixState.formattedMusicDuration}" +
+                                                (if (remixState.youtubeMusicAuthor != null) " • Channel: ${remixState.youtubeMusicAuthor}" else ""),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                            Icon(Icons.Filled.CheckCircle, contentDescription = "Ready", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = "Ready",
+                                tint = if (remixState.musicFileName.contains("YouTube")) Color(0xFFFF0000) else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
 
                 // Sample music options
                 Text(
-                    text = "Or select a royalty-free music track:",
+                    text = "Or keep original video audio / royalty-free track:",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

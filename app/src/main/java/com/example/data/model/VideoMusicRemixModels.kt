@@ -48,6 +48,11 @@ data class VideoMusicRemixState(
     val musicFileName: String = "Original Video Audio (Keep Same Music)",
     val musicFileUri: Uri? = null,
     val localMusicFile: File? = null,
+    val youtubeMusicUrl: String = "",
+    val isFetchingYouTubeMusic: Boolean = false,
+    val youtubeMusicError: String? = null,
+    val youtubeMusicTitle: String? = null,
+    val youtubeMusicAuthor: String? = null,
     val downloadedVideoFile: File? = null,
     val renderedMp4File: File? = null,
 

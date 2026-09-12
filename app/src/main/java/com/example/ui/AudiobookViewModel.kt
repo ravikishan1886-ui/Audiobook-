@@ -30,6 +30,7 @@ import com.example.data.samples.SampleBooks
 import com.example.video.VideoGenerator
 import com.example.video.VideoMusicRemixerEngine
 import com.example.video.VideoUrlUtils
+import com.example.video.YouTubeAudioExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1311,8 +1312,81 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 musicDurationMs = sample.durationMs,
                 musicFileUri = null,
                 localMusicFile = null,
-                errorMessage = null
+                errorMessage = null,
+                youtubeMusicError = null
             )
+        }
+    }
+
+    fun updateYouTubeMusicUrl(url: String) {
+        _remixState.update {
+            it.copy(
+                youtubeMusicUrl = url,
+                youtubeMusicError = null
+            )
+        }
+    }
+
+    fun fetchYouTubeMusic(youtubeUrl: String? = null) {
+        val targetUrl = youtubeUrl ?: _remixState.value.youtubeMusicUrl
+        if (targetUrl.isBlank()) {
+            _remixState.update {
+                it.copy(youtubeMusicError = "Please enter a YouTube video or music URL")
+            }
+            return
+        }
+
+        val videoId = YouTubeAudioExtractor.extractYouTubeVideoId(targetUrl)
+        if (videoId == null) {
+            _remixState.update {
+                it.copy(youtubeMusicError = "Invalid YouTube link. Please paste a link like https://www.youtube.com/watch?v=... or https://youtu.be/...")
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _remixState.update {
+                it.copy(
+                    isFetchingYouTubeMusic = true,
+                    youtubeMusicError = null,
+                    statusMessage = "Connecting to YouTube..."
+                )
+            }
+
+            val result = YouTubeAudioExtractor.fetchAndDecodeYouTubeAudio(
+                context = getApplication(),
+                youtubeUrl = targetUrl,
+                onProgress = { p, msg ->
+                    _remixState.update {
+                        it.copy(statusMessage = msg)
+                    }
+                }
+            )
+
+            result.onSuccess { audioResult ->
+                _remixState.update {
+                    it.copy(
+                        isFetchingYouTubeMusic = false,
+                        musicFileName = "${audioResult.title} (YouTube Music)",
+                        musicDurationMs = audioResult.durationMs,
+                        musicFileUri = Uri.fromFile(audioResult.pcmWavFile),
+                        localMusicFile = audioResult.pcmWavFile,
+                        youtubeMusicTitle = audioResult.title,
+                        youtubeMusicAuthor = audioResult.author,
+                        youtubeMusicUrl = targetUrl,
+                        youtubeMusicError = null,
+                        statusMessage = "YouTube music loaded: ${audioResult.title.take(30)}"
+                    )
+                }
+            }.onFailure { error ->
+                Log.e("AudiobookViewModel", "Failed to fetch YouTube music", error)
+                _remixState.update {
+                    it.copy(
+                        isFetchingYouTubeMusic = false,
+                        youtubeMusicError = error.message ?: "Failed to download audio from YouTube. Please verify the URL."
+                    )
+                }
+            }
         }
     }
 
@@ -1446,26 +1520,53 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 val isOriginalAudio = state.musicFileUri == null && 
+                    state.youtubeMusicUrl.isBlank() &&
                     (state.musicFileName.isBlank() || state.musicFileName.contains("Original", ignoreCase = true))
 
-                val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
-                    context = context,
-                    videoFile = videoFile,
-                    isOriginalAudio = isOriginalAudio,
-                    musicUri = state.musicFileUri,
-                    sampleTitle = state.musicFileName,
-                    sampleDurationMs = state.musicDurationMs,
-                    onProgress = { p, msg ->
-                        _remixState.update {
-                            it.copy(
-                                progressPercent = 0.20f + p * 0.15f,
-                                statusMessage = msg
-                            )
+                val musicFile: File = if (state.localMusicFile != null && state.localMusicFile.exists() && state.localMusicFile.length() > 44) {
+                    _remixState.update { it.copy(statusMessage = "Using prepared music soundtrack...") }
+                    state.localMusicFile
+                } else if (state.youtubeMusicUrl.isNotBlank() && state.musicFileUri == null) {
+                    _remixState.update { it.copy(statusMessage = "Downloading audio stream from YouTube...") }
+                    val ytResult = YouTubeAudioExtractor.fetchAndDecodeYouTubeAudio(
+                        context = context,
+                        youtubeUrl = state.youtubeMusicUrl,
+                        onProgress = { p, msg ->
+                            _remixState.update {
+                                it.copy(
+                                    progressPercent = 0.20f + p * 0.15f,
+                                    statusMessage = msg
+                                )
+                            }
                         }
+                    )
+                    val audioRes = ytResult.getOrThrow()
+                    _remixState.update {
+                        it.copy(
+                            musicFileName = "${audioRes.title} (YouTube Music)",
+                            musicDurationMs = audioRes.durationMs
+                        )
                     }
-                )
-
-                val musicFile = musicPrepareResult.getOrThrow()
+                    audioRes.pcmWavFile
+                } else {
+                    val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
+                        context = context,
+                        videoFile = videoFile,
+                        isOriginalAudio = isOriginalAudio,
+                        musicUri = state.musicFileUri,
+                        sampleTitle = state.musicFileName,
+                        sampleDurationMs = state.musicDurationMs,
+                        onProgress = { p, msg ->
+                            _remixState.update {
+                                it.copy(
+                                    progressPercent = 0.20f + p * 0.15f,
+                                    statusMessage = msg
+                                )
+                            }
+                        }
+                    )
+                    musicPrepareResult.getOrThrow()
+                }
 
                 _remixState.update {
                     it.copy(

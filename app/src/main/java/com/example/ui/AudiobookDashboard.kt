@@ -204,6 +204,8 @@ fun AudiobookDashboard(
                     onMusicSelected = { uri, name -> viewModel.selectRemixMusic(uri, name) },
                     onSampleVideoSelected = { viewModel.selectSampleVideo(it) },
                     onSampleMusicSelected = { viewModel.selectSampleMusic(it) },
+                    onYouTubeMusicUrlChange = { viewModel.updateYouTubeMusicUrl(it) },
+                    onFetchYouTubeMusic = { viewModel.fetchYouTubeMusic(it) },
                     onRightsConfirmedChange = { viewModel.setRemixRightsConfirmed(it) },
                     onNextToPreview = { viewModel.openFullscreenPreview() },
                     onDirectRemixNow = { viewModel.startVideoProcessing() }

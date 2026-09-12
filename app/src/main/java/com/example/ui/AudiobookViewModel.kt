@@ -1331,15 +1331,17 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
         val targetUrl = youtubeUrl ?: _remixState.value.youtubeMusicUrl
         if (targetUrl.isBlank()) {
             _remixState.update {
-                it.copy(youtubeMusicError = "Please enter a YouTube video or music URL")
+                it.copy(youtubeMusicError = "Please enter a YouTube link or public music URL")
             }
             return
         }
 
-        val videoId = YouTubeAudioExtractor.extractYouTubeVideoId(targetUrl)
-        if (videoId == null) {
+        val isYouTube = YouTubeAudioExtractor.extractYouTubeVideoId(targetUrl) != null
+        val isDirectPublic = targetUrl.startsWith("http://", ignoreCase = true) || targetUrl.startsWith("https://", ignoreCase = true)
+
+        if (!isYouTube && !isDirectPublic) {
             _remixState.update {
-                it.copy(youtubeMusicError = "Invalid YouTube link. Please paste a link like https://www.youtube.com/watch?v=... or https://youtu.be/...")
+                it.copy(youtubeMusicError = "Please paste a valid YouTube link (watch, Shorts, youtu.be) or public music URL (.mp3, .wav, .m4a)")
             }
             return
         }
@@ -1349,13 +1351,13 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 it.copy(
                     isFetchingYouTubeMusic = true,
                     youtubeMusicError = null,
-                    statusMessage = "Connecting to YouTube..."
+                    statusMessage = if (isYouTube) "Connecting to YouTube..." else "Connecting to public music stream..."
                 )
             }
 
-            val result = YouTubeAudioExtractor.fetchAndDecodeYouTubeAudio(
+            val result = YouTubeAudioExtractor.fetchAndDecodePublicMusic(
                 context = getApplication(),
-                youtubeUrl = targetUrl,
+                rawUrl = targetUrl,
                 onProgress = { p, msg ->
                     _remixState.update {
                         it.copy(statusMessage = msg)
@@ -1367,7 +1369,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 _remixState.update {
                     it.copy(
                         isFetchingYouTubeMusic = false,
-                        musicFileName = "${audioResult.title} (YouTube Music)",
+                        musicFileName = if (audioResult.videoId != null) "${audioResult.title} (YouTube Music)" else "${audioResult.title} (Public Music)",
                         musicDurationMs = audioResult.durationMs,
                         musicFileUri = Uri.fromFile(audioResult.pcmWavFile),
                         localMusicFile = audioResult.pcmWavFile,
@@ -1375,15 +1377,15 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                         youtubeMusicAuthor = audioResult.author,
                         youtubeMusicUrl = targetUrl,
                         youtubeMusicError = null,
-                        statusMessage = "YouTube music loaded: ${audioResult.title.take(30)}"
+                        statusMessage = "Music loaded: ${audioResult.title.take(30)}"
                     )
                 }
             }.onFailure { error ->
-                Log.e("AudiobookViewModel", "Failed to fetch YouTube music", error)
+                Log.e("AudiobookViewModel", "Failed to fetch music", error)
                 _remixState.update {
                     it.copy(
                         isFetchingYouTubeMusic = false,
-                        youtubeMusicError = error.message ?: "Failed to download audio from YouTube. Please verify the URL."
+                        youtubeMusicError = error.message ?: "Failed to load audio. Please verify the URL is public and accessible."
                     )
                 }
             }
@@ -1527,10 +1529,10 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     _remixState.update { it.copy(statusMessage = "Using prepared music soundtrack...") }
                     state.localMusicFile
                 } else if (state.youtubeMusicUrl.isNotBlank()) {
-                    _remixState.update { it.copy(statusMessage = "Loading YouTube music track...") }
-                    val ytResult = YouTubeAudioExtractor.fetchAndDecodeYouTubeAudio(
+                    _remixState.update { it.copy(statusMessage = "Loading music track...") }
+                    val ytResult = YouTubeAudioExtractor.fetchAndDecodePublicMusic(
                         context = context,
-                        youtubeUrl = state.youtubeMusicUrl,
+                        rawUrl = state.youtubeMusicUrl,
                         onProgress = { p, msg ->
                             _remixState.update {
                                 it.copy(
@@ -1543,7 +1545,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     val audioRes = ytResult.getOrThrow()
                     _remixState.update {
                         it.copy(
-                            musicFileName = "${audioRes.title} (YouTube Music)",
+                            musicFileName = if (audioRes.videoId != null) "${audioRes.title} (YouTube Music)" else "${audioRes.title} (Public Music)",
                             musicDurationMs = audioRes.durationMs
                         )
                     }

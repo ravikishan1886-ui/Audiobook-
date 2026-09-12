@@ -93,8 +93,20 @@ class VideoUrlUtilsTest {
         assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk"))
         // YouTube Shorts URL
         assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("https://youtube.com/shorts/FLKvBcLv-AY"))
+        // YouTube Shorts URL from user screenshot
+        assertEquals("mN0EiTdNmHs", YouTubeAudioExtractor.extractYouTubeVideoId("https://youtube.com/shorts/mN0EiTdNmHs"))
         // Direct video ID
         assertEquals("FLKvBcLv-AY", YouTubeAudioExtractor.extractYouTubeVideoId("FLKvBcLv-AY"))
+    }
+
+    @Test
+    fun isPublicMusicUrl_detectsYouTubeAndDirectPublicAudioUrls() {
+        assertTrue(YouTubeAudioExtractor.isPublicMusicUrl("https://youtube.com/shorts/mN0EiTdNmHs"))
+        assertTrue(YouTubeAudioExtractor.isPublicMusicUrl("https://youtu.be/FLKvBcLv-AY?si=ZVaWzq5bfVcexDWk"))
+        assertTrue(YouTubeAudioExtractor.isPublicMusicUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
+        assertTrue(YouTubeAudioExtractor.isPublicMusicUrl("https://actions.google.com/sounds/v1/weather/thunderstorm.ogg"))
+        assertTrue(YouTubeAudioExtractor.isPublicMusicUrl("https://example.com/music/sample.mp3"))
+        assertFalse(YouTubeAudioExtractor.isPublicMusicUrl("not_a_valid_music_url"))
     }
 
     @Test

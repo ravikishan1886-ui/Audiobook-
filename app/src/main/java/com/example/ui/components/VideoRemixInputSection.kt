@@ -108,6 +108,12 @@ val SAMPLE_YOUTUBE_MUSICS = listOf(
         durationLabel = "03:18"
     ),
     SampleYouTubeMusicOption(
+        title = "BTTH Xiao Yan (Shorts)",
+        artist = "Google donghua",
+        url = "https://youtube.com/shorts/mN0EiTdNmHs",
+        durationLabel = "00:45"
+    ),
+    SampleYouTubeMusicOption(
         title = "Never Gonna Give You Up",
         artist = "Rick Astley",
         url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -389,7 +395,7 @@ fun VideoRemixInputSection(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Paste YouTube Video or Music URL:",
+                                text = "Paste YouTube Video / Shorts or Public Music URL:",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -404,7 +410,7 @@ fun VideoRemixInputSection(
                                 .testTag("youtube_music_url_input"),
                             placeholder = {
                                 Text(
-                                    "e.g. https://youtu.be/FLKvBcLv-AY?si=... or watch?v=...",
+                                    "e.g. https://youtu.be/... or direct audio link (.mp3, .wav, .m4a)",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 12.sp
                                 )
@@ -435,9 +441,13 @@ fun VideoRemixInputSection(
                             }
                         )
 
-                        // Live YouTube URL Detection & Validation Badge
-                        val detectedVideoId: String? = remember(remixState.youtubeMusicUrl) {
-                            YouTubeAudioExtractor.extractYouTubeVideoId(remixState.youtubeMusicUrl)
+                        // Live URL Detection & Validation Badges
+                        val urlTrimmed = remixState.youtubeMusicUrl.trim()
+                        val detectedVideoId: String? = remember(urlTrimmed) {
+                            YouTubeAudioExtractor.extractYouTubeVideoId(urlTrimmed)
+                        }
+                        val isDirectPublicAudio = remember(urlTrimmed, detectedVideoId) {
+                            detectedVideoId == null && (urlTrimmed.startsWith("http://", ignoreCase = true) || urlTrimmed.startsWith("https://", ignoreCase = true))
                         }
 
                         if (detectedVideoId != null) {
@@ -468,6 +478,39 @@ fun VideoRemixInputSection(
                                             text = "Video ID: $detectedVideoId (Ready to extract music)",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color(0xFF2E7D32),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (isDirectPublicAudio) {
+                            Surface(
+                                color = Color(0xFFE3F2FD),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF1976D2),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Public Music URL Accepted ✓",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0D47A1)
+                                        )
+                                        Text(
+                                            text = "Direct web audio stream (Ready to download & remix)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF1976D2),
                                             fontSize = 10.sp
                                         )
                                     }
@@ -506,7 +549,7 @@ fun VideoRemixInputSection(
                             }
                         }
 
-                        // Fetch YouTube Music Button
+                        // Fetch YouTube / Public Music Button
                         Button(
                             onClick = { onFetchYouTubeMusic(null) },
                             enabled = remixState.youtubeMusicUrl.isNotBlank() && !remixState.isFetchingYouTubeMusic,
@@ -526,11 +569,11 @@ fun VideoRemixInputSection(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Downloading YouTube Music...", fontWeight = FontWeight.Medium)
+                                Text("Downloading Music...", fontWeight = FontWeight.Medium)
                             } else {
                                 Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Fetch & Use YouTube Music", fontWeight = FontWeight.Medium)
+                                Text("Fetch & Use Music Track", fontWeight = FontWeight.Medium)
                             }
                         }
 

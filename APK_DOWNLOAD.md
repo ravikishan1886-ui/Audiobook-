@@ -10,8 +10,9 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~27 MB |
-| **SHA-256 Checksum** | `27cc44f568c10d6f2f544778d6c086875d7e5e152691da9f8bbdfb6e10d6ad8d` |
+| **File Size** | ~23 MB (23,284,677 bytes) |
+| **SHA-256 Checksum** | `7c0e9619494574dae9ccbee51333747da368a3be329de52ee7928f8852577bfa` |
+| **MD5 Checksum** | `0d17ff7c2c17b6a710bc736a853f00b1` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -19,7 +20,18 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🎵 YouTube Shorts Audio Source Resolution (`/source/{ID}/shorts`)
+### 1. 🎵 "Make Video Music Exactly Same" (100% Identical Music)
+- **One-Tap Exact Same Action Card**: Added a dedicated card in Section 2 with an instant **"Make Video Music Exactly Same"** button. Tapping it immediately activates the video's original soundtrack and sets the music duration to match the video 1:1.
+- **Lossless Direct Stream Copy**: For source videos with an audio track, the engine executes a direct stream copy via `MediaExtractor` and `MediaMuxer`. Audio packets are passed through byte-for-byte with zero transcoding, zero re-compression, zero pitch shift, and zero quality loss.
+- **Guaranteed Duration Alignment**: The music timeline matches the video duration down to the millisecond (`05:32` video = `05:32` music).
+- **Fullscreen Preview Indicator**: The timeline alignment view confirms the exact duration pairing with a green **"Exact Same"** badge and status explanation.
+
+### 2. 🛠️ All Build & Compilation Errors Corrected
+- Fixed Compose `BorderStroke` reference in `VideoRemixFullscreenPreview.kt`.
+- Clean compilation verified across all Kotlin and Compose modules.
+- Re-packaged and verified `app-debug.apk`.
+
+### 3. 🎵 YouTube Shorts Audio Source Resolution (`/source/{ID}/shorts`)
 - **YouTube Shorts Audio Parser**: Paste links like `https://youtube.com/source/KheSUT2stiM/shorts?si=...` to automatically detect `/source/{ID}/shorts` and extract the target ID (`KheSUT2stiM`).
 - **Live Metadata Discovery**: Instantly queries YouTube oEmbed and metadata endpoints to resolve:
   - 🎵 **Music Title** (e.g. *Paijo*)

@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -236,7 +237,7 @@ fun VideoRemixFullscreenPreview(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFFE57373))
+                                        .background(if (remixState.isExactSameMusic) Color(0xFF2E7D32) else Color(0xFFE57373))
                                 )
                                 Text(
                                     text = "Music duration:",
@@ -244,13 +245,27 @@ fun VideoRemixFullscreenPreview(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                if (remixState.isExactSameMusic) {
+                                    Surface(
+                                        color = Color(0xFF2E7D32).copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Exact Same",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF2E7D32),
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                             }
                             Text(
-                                text = remixState.formattedMusicDuration, // e.g. 03:15
+                                text = remixState.formattedMusicDuration, // e.g. 05:32 (if same) or 03:15
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.error
+                                color = if (remixState.isExactSameMusic) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
                             )
                         }
 
@@ -292,10 +307,11 @@ fun VideoRemixFullscreenPreview(
                     }
                 }
 
-                // Automatic Adjustment Explanation Card
+                // Music Synchronization / Adjustment Explanation Card
                 Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    color = if (remixState.isExactSameMusic) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
                     shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, if (remixState.isExactSameMusic) Color(0xFF2E7D32).copy(alpha = 0.4f) else Color.Transparent),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -306,22 +322,25 @@ fun VideoRemixFullscreenPreview(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.AutoFixHigh,
+                            imageVector = if (remixState.isExactSameMusic) Icons.Filled.CheckCircle else Icons.Filled.AutoFixHigh,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            tint = if (remixState.isExactSameMusic) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
                         Column {
                             Text(
-                                text = "Automatic Music Duration Adjustment",
+                                text = if (remixState.isExactSameMusic) "100% Exact Same Video Music" else "Automatic Music Duration Adjustment",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (remixState.isExactSameMusic) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Because the music (${remixState.formattedMusicDuration}) is shorter than the video (${remixState.formattedOriginalDuration}), the audio engine will seamlessly loop and smooth-fade the soundtrack to fill exactly ${remixState.formattedFinalDuration}.",
+                                text = if (remixState.isExactSameMusic)
+                                    "The video soundtrack and music are exactly the same (${remixState.formattedFinalDuration}). The audio is preserved 1:1 without alteration, pitch shift, or lossy transcoding."
+                                else
+                                    "Because the music (${remixState.formattedMusicDuration}) is different from the video (${remixState.formattedOriginalDuration}), the audio engine seamlessly adjusts the track to match exactly ${remixState.formattedFinalDuration}.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (remixState.isExactSameMusic) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

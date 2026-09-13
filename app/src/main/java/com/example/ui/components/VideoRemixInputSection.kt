@@ -158,6 +158,7 @@ fun VideoRemixInputSection(
     onYouTubeMusicUrlChange: (String) -> Unit = {},
     onFetchYouTubeMusic: (String?) -> Unit = {},
     onUseThisMusic: () -> Unit = { onFetchYouTubeMusic(null) },
+    onMakeVideoMusicSame: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -378,6 +379,94 @@ fun VideoRemixInputSection(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFFF0000)
+                            )
+                        }
+                    }
+                }
+
+                // Dedicated "Make Video Music Exactly Same" Quick Selector Card
+                val isSameMusicActive = remixState.isExactSameMusic
+                Surface(
+                    color = if (isSameMusicActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(
+                        1.5.dp,
+                        if (isSameMusicActive) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("card_make_video_music_same")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (isSameMusicActive) Icons.Filled.Check else Icons.Filled.Sync,
+                                    contentDescription = null,
+                                    tint = if (isSameMusicActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "Make Video Music Exactly Same",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSameMusicActive) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "ACTIVE",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = if (isSameMusicActive)
+                                    "✓ Original video audio preserved 1:1 without alteration or transcoding"
+                                else
+                                    "Keep original video soundtrack 100% identical in duration and audio",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Button(
+                            onClick = onMakeVideoMusicSame,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = if (isSameMusicActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("btn_make_video_music_same")
+                        ) {
+                            Text(
+                                text = if (isSameMusicActive) "Selected" else "Set Same",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }

@@ -97,10 +97,14 @@ data class VideoMusicRemixState(
     val isPreserveOriginalAudio: Boolean = false
 ) {
     val isExactSameMusic: Boolean
-        get() = isPreserveOriginalAudio ||
+        get() = (isPreserveOriginalAudio ||
                 ((musicFileName.contains("Original Video Audio", ignoreCase = true) ||
-                  musicFileName.contains("Keep Same Music", ignoreCase = true)) &&
-                 musicFileUri == null && youtubeMusicUrl.isBlank() && localMusicFile == null)
+                  musicFileName.contains("Keep Same Music", ignoreCase = true)))) &&
+                musicFileUri == null &&
+                youtubeMusicUrl.isBlank() &&
+                (musicFileName.contains("Original Video Audio", ignoreCase = true) ||
+                 musicFileName.contains("Keep Same Music", ignoreCase = true) ||
+                 musicFileName.isBlank())
 
     val formattedOriginalDuration: String
         get() = formatDuration(originalDurationMs)

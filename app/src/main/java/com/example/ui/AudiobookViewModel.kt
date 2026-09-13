@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -1275,13 +1276,33 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun selectRemixMusic(uri: Uri, fileName: String) {
-        _remixState.update {
-            it.copy(
-                musicFileUri = uri,
-                musicFileName = fileName,
-                localMusicFile = null,
-                errorMessage = null
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            var extractedDuration = 0L
+            try {
+                val mmr = MediaMetadataRetriever()
+                mmr.setDataSource(getApplication<Application>().applicationContext, uri)
+                val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                extractedDuration = durStr?.toLongOrNull() ?: 0L
+                mmr.release()
+            } catch (e: Exception) {}
+
+            _remixState.update {
+                it.copy(
+                    isPreserveOriginalAudio = false,
+                    musicFileUri = uri,
+                    musicFileName = fileName,
+                    musicDurationMs = if (extractedDuration > 0) extractedDuration else 180000L,
+                    localMusicFile = null,
+                    youtubeMusicUrl = "",
+                    youtubeMusicTitle = null,
+                    youtubeMusicAuthor = null,
+                    youtubeMusicThumbnailUrl = null,
+                    resolvedYouTubeSource = null,
+                    errorMessage = null,
+                    youtubeMusicError = null,
+                    statusMessage = "Audio file selected: $fileName"
+                )
+            }
         }
     }
 
@@ -1309,6 +1330,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
         val currentDur = _remixState.value.originalDurationMs.takeIf { it > 0 } ?: 332000L
         _remixState.update {
             it.copy(
+                isPreserveOriginalAudio = true,
                 musicFileName = "Original Video Audio (Keep Same Music)",
                 musicDurationMs = currentDur,
                 finalDurationMs = currentDur,
@@ -1327,20 +1349,21 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun selectSampleMusic(sample: SampleMusicOption) {
-        val isOrig = sample.title.contains("Original", ignoreCase = true)
+        val isOrig = sample.title.contains("Original", ignoreCase = true) || sample.title.contains("Same", ignoreCase = true)
         val currentDur = _remixState.value.originalDurationMs.takeIf { it > 0 } ?: 332000L
         _remixState.update {
             it.copy(
+                isPreserveOriginalAudio = isOrig,
                 musicFileName = sample.title,
                 musicDurationMs = if (isOrig) currentDur else sample.durationMs,
                 finalDurationMs = if (isOrig) currentDur else it.finalDurationMs,
                 musicFileUri = null,
                 localMusicFile = null,
-                youtubeMusicUrl = if (isOrig) "" else it.youtubeMusicUrl,
-                youtubeMusicTitle = if (isOrig) null else it.youtubeMusicTitle,
-                youtubeMusicAuthor = if (isOrig) null else it.youtubeMusicAuthor,
-                youtubeMusicThumbnailUrl = if (isOrig) null else it.youtubeMusicThumbnailUrl,
-                resolvedYouTubeSource = if (isOrig) null else it.resolvedYouTubeSource,
+                youtubeMusicUrl = "",
+                youtubeMusicTitle = null,
+                youtubeMusicAuthor = null,
+                youtubeMusicThumbnailUrl = null,
+                resolvedYouTubeSource = null,
                 errorMessage = null,
                 youtubeMusicError = null,
                 statusMessage = if (isOrig) "Using exact same video music (Original soundtrack)" else "Music selected: ${sample.title}"
@@ -1431,6 +1454,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             result.onSuccess { audioResult ->
                 _remixState.update {
                     it.copy(
+                        isPreserveOriginalAudio = false,
                         isFetchingYouTubeMusic = false,
                         musicFileName = if (audioResult.videoId != null) "${audioResult.title} (YouTube Music)" else "${audioResult.title} (Public Music)",
                         musicDurationMs = audioResult.durationMs,

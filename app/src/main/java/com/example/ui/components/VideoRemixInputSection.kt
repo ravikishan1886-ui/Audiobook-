@@ -85,6 +85,18 @@ val SAMPLE_MUSICS = listOf(
         genre = "Lo-Fi / Beats"
     ),
     SampleMusicOption(
+        title = "Phonk Anime Fight Beat",
+        durationLabel = "02:18",
+        durationMs = 138000L,
+        genre = "Phonk / Drift Bass"
+    ),
+    SampleMusicOption(
+        title = "Upbeat Electronic Dance",
+        durationLabel = "02:50",
+        durationMs = 170000L,
+        genre = "EDM / Electro"
+    ),
+    SampleMusicOption(
         title = "Inspiring Acoustic Melody",
         durationLabel = "02:40",
         durationMs = 160000L,
@@ -95,6 +107,18 @@ val SAMPLE_MUSICS = listOf(
         durationLabel = "04:50",
         durationMs = 290000L,
         genre = "Cinematic / Strings"
+    ),
+    SampleMusicOption(
+        title = "Energetic Pop Beat",
+        durationLabel = "03:05",
+        durationMs = 185000L,
+        genre = "Pop / Groovy"
+    ),
+    SampleMusicOption(
+        title = "Deep Emotional Piano",
+        durationLabel = "02:30",
+        durationMs = 150000L,
+        genre = "Piano / Ballad"
     )
 )
 

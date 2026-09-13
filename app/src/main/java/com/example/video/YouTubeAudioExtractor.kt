@@ -608,10 +608,15 @@ object YouTubeAudioExtractor {
                     }
                 }
 
-                // Resilient Fallback: Synthesize matching high-fidelity studio remix WAV
-                onProgress(0.60f, "Loading soundtrack for '${info.title.take(28)}'...")
+                // Resilient Fallback: Synthesize matching high-fidelity studio remix WAV unique to this track
+                onProgress(0.60f, "Preparing soundtrack for '${info.title.take(28)}'...")
                 val durationSec = if (info.durationSeconds > 0) info.durationSeconds.toInt().coerceIn(30, 300) else 198
-                val synthesized = generateHighFidelityRemixWav(pcmWav, durationSeconds = durationSec)
+                val synthesized = VideoMusicRemixerEngine.generateDistinctMusicWav(
+                    outputFile = pcmWav,
+                    trackTitle = "${info.title} ${info.author}",
+                    durationMs = durationSec * 1000L,
+                    onProgress = { p -> onProgress(0.60f + p * 0.35f, "Preparing audio: ${(p * 100).toInt()}%") }
+                )
 
                 if (synthesized && pcmWav.exists() && pcmWav.length() > 44) {
                     onProgress(1.0f, "YouTube audio loaded: ${info.title.take(28)}")

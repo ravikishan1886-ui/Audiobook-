@@ -22,7 +22,7 @@ import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import kotlin.math.sin
+import kotlin.math.*
 
 object VideoMusicRemixerEngine {
     private const val TAG = "VideoMusicRemixer"
@@ -368,17 +368,17 @@ object VideoMusicRemixerEngine {
                 onProgress(1.0f, "Music file loaded (${outputFile.length() / 1024} KB)")
                 Result.success(outputFile)
             } else {
-                // Case 3: If original soundtrack selected or fallback
-                if (videoFile != null && videoFile.exists() && (sampleTitle?.contains("Original", ignoreCase = true) == true || sampleTitle.isNullOrBlank())) {
+                // Case 3: Only if user explicitly requested original video audio
+                if (isOriginalAudio && videoFile != null && videoFile.exists()) {
                     val extracted = decodeAudioToPcmWav(videoFile, outputFile)
                     if (extracted && outputFile.exists() && outputFile.length() > 44) {
                         return@withContext Result.success(outputFile)
                     }
                 }
 
-                // Case 4: Selected sample track
+                // Case 4: Selected distinct music track
                 onProgress(0.2f, "Preparing high-fidelity soundtrack '${sampleTitle ?: "Audio"}'...")
-                generateSyntheticMusicWav(outputFile, sampleDurationMs) { p ->
+                generateDistinctMusicWav(outputFile, sampleTitle, sampleDurationMs) { p ->
                     onProgress(p, "Rendering music track: ${(p * 100).toInt()}%")
                 }
                 Result.success(outputFile)
@@ -608,7 +608,7 @@ object VideoMusicRemixerEngine {
             }
 
             if (availableDataSize <= 0) {
-                return@withContext generateSyntheticMusicWav(outputFile, targetDurationMs) { p ->
+                return@withContext generateDistinctMusicWav(outputFile, musicFile.nameWithoutExtension, targetDurationMs) { p ->
                     onProgress(p, "Mixing soundtrack: ${(p * 100).toInt()}%")
                 }.let { Result.success(outputFile) }
             }
@@ -1138,17 +1138,43 @@ object VideoMusicRemixerEngine {
         }
     }
 
-    private fun generateSyntheticMusicWav(
+    fun generateDistinctMusicWav(
         outputFile: File,
+        trackTitle: String?,
         durationMs: Long,
         onProgress: (Float) -> Unit
-    ) {
+    ): Boolean {
         val sampleRate = 44100
         val channels = 2
         val bitsPerSample = 16
         val bytesPerSecond = sampleRate * channels * (bitsPerSample / 8)
-        val totalBytes = (durationMs * bytesPerSecond) / 1000L
+        val effectiveDurationMs = durationMs.coerceAtLeast(3000L)
+        val totalBytes = (effectiveDurationMs * bytesPerSecond) / 1000L
         val totalSamples = (totalBytes / 4).toInt()
+
+        val titleLower = (trackTitle ?: "").lowercase()
+
+        // Genre Classification
+        val isPhonk = titleLower.contains("phonk") || titleLower.contains("anime") || titleLower.contains("fight") || titleLower.contains("drift")
+        val isLofi = titleLower.contains("lofi") || titleLower.contains("lo-fi") || titleLower.contains("chill") || titleLower.contains("ambient")
+        val isEdm = titleLower.contains("dance") || titleLower.contains("edm") || titleLower.contains("electro") || titleLower.contains("beat") && titleLower.contains("upbeat")
+        val isAcoustic = titleLower.contains("acoustic") || titleLower.contains("inspiring") || titleLower.contains("melody")
+        val isCinematic = titleLower.contains("cinematic") || titleLower.contains("epic") || titleLower.contains("string")
+        val isPop = titleLower.contains("pop") || titleLower.contains("groov")
+        val isPiano = titleLower.contains("piano") || titleLower.contains("emotional")
+
+        val bpm: Double = when {
+            isPhonk -> 138.0
+            isLofi -> 80.0
+            isEdm -> 128.0
+            isAcoustic -> 104.0
+            isCinematic -> 72.0
+            isPop -> 120.0
+            isPiano -> 68.0
+            else -> 100.0 + (Math.abs(titleLower.hashCode()) % 28)
+        }
+
+        val beatInterval = 60.0 / bpm
 
         FileOutputStream(outputFile).use { output ->
             output.write(ByteArray(44)) // Header placeholder
@@ -1157,40 +1183,286 @@ object VideoMusicRemixerEngine {
             var bytesWritten = 0L
             var sampleIdx = 0
 
-            // Musical chords: C major 7th / A minor ambient progression
-            val chordFreqs = listOf(
-                doubleArrayOf(261.63, 329.63, 392.00, 493.88), // Cmaj7
-                doubleArrayOf(220.00, 261.63, 329.63, 392.00), // Am7
-                doubleArrayOf(174.61, 220.00, 261.63, 329.63), // Fmaj7
-                doubleArrayOf(196.00, 246.94, 293.66, 349.23)  // G7
-            )
-
             while (sampleIdx < totalSamples) {
                 var chunkOffset = 0
                 while (chunkOffset < chunk.size && sampleIdx < totalSamples) {
                     val timeSec = sampleIdx.toDouble() / sampleRate
-                    val chordIdx = ((timeSec / 4.0).toInt()) % chordFreqs.size
-                    val freqs = chordFreqs[chordIdx]
+                    val beatTime = timeSec % beatInterval
+                    val beatProgress = beatTime / beatInterval
+                    val currentBeat = ((timeSec / beatInterval) % 4).toInt()
+                    val barNum = ((timeSec / (beatInterval * 4.0))).toInt()
 
-                    var sampleValue = 0.0
-                    for (freq in freqs) {
-                        sampleValue += sin(2.0 * Math.PI * freq * timeSec) * 0.15
+                    var leftSample = 0.0
+                    var rightSample = 0.0
+
+                    when {
+                        isPhonk -> {
+                            // High Energy Phonk / Anime Drift Beat: 138 BPM in F# minor
+                            // 1. Memphis Cowbell melody (F#4, A4, B4, C#5, A4, F#4)
+                            val cowbellNotes = doubleArrayOf(369.99, 440.00, 493.88, 554.37, 440.00, 369.99, 440.00, 329.63)
+                            val noteIdx = ((timeSec / (beatInterval / 2.0)).toInt()) % cowbellNotes.size
+                            val cbFreq = cowbellNotes[noteIdx]
+                            val noteTime = (timeSec % (beatInterval / 2.0))
+                            val cbEnv = max(0.0, 1.0 - noteTime * 9.0)
+                            // Cowbell characteristic: metallic triangle + square blend
+                            val cbTone = sin(2.0 * Math.PI * cbFreq * timeSec) * 0.7 + sin(2.0 * Math.PI * (cbFreq * 1.5) * timeSec) * 0.3
+                            val cowbell = cbTone * cbEnv * 0.35
+
+                            // 2. Heavy 808 Sub-Bass slide (F#1 = 46.25 Hz, sliding to A1 = 55.0 Hz, E1 = 41.2 Hz)
+                            val bassPitch = if (barNum % 4 == 3) 41.2 else if (currentBeat >= 2) 55.0 else 46.25
+                            val bassDist = sin(2.0 * Math.PI * bassPitch * timeSec)
+                            val bassSaturated = Math.tanh(bassDist * 2.5) * 0.38
+
+                            // 3. Punchy Trap Kick on beats 0 and 2.5
+                            var kick = 0.0
+                            if (currentBeat == 0 || (currentBeat == 2 && beatProgress >= 0.5)) {
+                                val kickT = if (currentBeat == 0) beatTime else (beatTime - beatInterval * 0.5)
+                                if (kickT in 0.0..0.15) {
+                                    val kFreq = 140.0 * max(0.0, 1.0 - kickT * 12.0) + 45.0
+                                    kick = sin(2.0 * Math.PI * kFreq * kickT) * max(0.0, 1.0 - kickT / 0.15) * 0.50
+                                }
+                            }
+
+                            // 4. Snare / Clap on beat 2
+                            var snare = 0.0
+                            if (currentBeat == 2 && beatTime in 0.0..0.18) {
+                                val sNoise = (sin(timeSec * 7321.0) + sin(timeSec * 13842.0)) * 0.5
+                                snare = sNoise * max(0.0, 1.0 - beatTime / 0.18) * 0.30
+                            }
+
+                            // 5. Rapid 16th-note Trap Hi-Hats
+                            val hatT = timeSec % (beatInterval / 4.0)
+                            val hatNoise = sin(timeSec * 21950.0) * max(0.0, 1.0 - hatT * 35.0) * 0.12
+
+                            val mixed = cowbell + bassSaturated + kick + snare + hatNoise
+                            leftSample = mixed * 0.95
+                            rightSample = (cowbell * 1.1 + bassSaturated + kick + snare + hatNoise * 0.8) * 0.95
+                        }
+
+                        isLofi -> {
+                            // Warm Lo-Fi Chillhop: 80 BPM in Eb Major (Ebmaj7 - Cm7 - Fm7 - Bb7)
+                            val chordProgressions = listOf(
+                                doubleArrayOf(311.13, 392.00, 466.16, 587.33), // Ebmaj7
+                                doubleArrayOf(261.63, 311.13, 392.00, 466.16), // Cm7
+                                doubleArrayOf(174.61, 207.65, 261.63, 311.13), // Fm7
+                                doubleArrayOf(233.08, 293.66, 349.23, 415.30)  // Bb7
+                            )
+                            val chord = chordProgressions[barNum % 4]
+
+                            // Rhodes electric piano with warm vibrato
+                            val tremolo = 1.0 + 0.15 * sin(2.0 * Math.PI * 4.5 * timeSec)
+                            var rhodes = 0.0
+                            for (f in chord) {
+                                rhodes += (sin(2.0 * Math.PI * f * timeSec) + 0.25 * sin(2.0 * Math.PI * (f * 2.0) * timeSec)) * 0.08
+                            }
+                            rhodes *= tremolo
+
+                            // Warm Walking Jazz Sub-Bass
+                            val bassFreq = chord[0] / 4.0
+                            val bass = sin(2.0 * Math.PI * bassFreq * timeSec) * 0.22
+
+                            // Soft Boom-Bap Kick on beat 0 and beat 2.5
+                            var kick = 0.0
+                            if (currentBeat == 0 && beatTime in 0.0..0.12) {
+                                kick = sin(2.0 * Math.PI * 65.0 * beatTime) * max(0.0, 1.0 - beatTime / 0.12) * 0.35
+                            }
+
+                            // Rimshot on beat 2
+                            var rimshot = 0.0
+                            if (currentBeat == 2 && beatTime in 0.0..0.06) {
+                                rimshot = sin(2.0 * Math.PI * 1200.0 * beatTime) * max(0.0, 1.0 - beatTime / 0.06) * 0.18
+                            }
+
+                            // Subtle vinyl dust texture
+                            val vinyl = (sin(timeSec * 1543.0) * sin(timeSec * 8921.0)) * 0.015
+
+                            leftSample = (rhodes * 1.05 + bass + kick + rimshot + vinyl)
+                            rightSample = (rhodes * 0.95 + bass + kick + rimshot + vinyl)
+                        }
+
+                        isEdm -> {
+                            // Upbeat Electronic Dance: 128 BPM in A minor (Am - F - C - G)
+                            val edmChords = listOf(
+                                doubleArrayOf(220.0, 261.63, 329.63, 440.0), // Am
+                                doubleArrayOf(174.61, 220.0, 261.63, 349.23), // F
+                                doubleArrayOf(261.63, 329.63, 392.0, 523.25), // C
+                                doubleArrayOf(196.0, 246.94, 293.66, 392.0)  // G
+                            )
+                            val chord = edmChords[barNum % 4]
+
+                            // Four-on-the-floor Kick
+                            val kickT = beatTime
+                            val kick = if (kickT in 0.0..0.14) {
+                                val kf = 130.0 * max(0.0, 1.0 - kickT * 10.0) + 50.0
+                                sin(2.0 * Math.PI * kf * kickT) * max(0.0, 1.0 - kickT / 0.14) * 0.48
+                            } else 0.0
+
+                            // Sidechain ducking envelope (ducks when kick hits)
+                            val sidechain = min(1.0, beatProgress * 2.2)
+
+                            // Pumping off-beat bass
+                            val bassFreq = chord[0] / 2.0
+                            val bassEnv = if (beatProgress in 0.3..0.9) max(0.0, 1.0 - (beatProgress - 0.3) * 2.0) else 0.0
+                            val bass = sin(2.0 * Math.PI * bassFreq * timeSec) * bassEnv * 0.32
+
+                            // Supersaw synth lead arpeggio
+                            val arpNotes = doubleArrayOf(chord[0] * 2.0, chord[1] * 2.0, chord[2] * 2.0, chord[3] * 2.0)
+                            val arpIdx = ((timeSec / (beatInterval / 4.0)).toInt()) % 4
+                            val arpFreq = arpNotes[arpIdx]
+                            val arp = (sin(2.0 * Math.PI * arpFreq * timeSec) + 0.5 * sin(2.0 * Math.PI * (arpFreq * 1.005) * timeSec)) * 0.16 * sidechain
+
+                            // Off-beat open hi-hat
+                            var hat = 0.0
+                            if (beatProgress in 0.45..0.75) {
+                                val ht = beatProgress - 0.45
+                                hat = sin(timeSec * 18450.0) * max(0.0, 1.0 - ht / 0.30) * 0.14
+                            }
+
+                            leftSample = kick + bass + arp + hat * 0.8
+                            rightSample = kick + bass + arp * 1.05 + hat * 1.2
+                        }
+
+                        isAcoustic -> {
+                            // Uplifting Acoustic Melody: 104 BPM in D major (D - A - Bm - G)
+                            val acousticChords = listOf(
+                                doubleArrayOf(293.66, 369.99, 440.0, 587.33), // D
+                                doubleArrayOf(220.00, 277.18, 329.63, 440.0), // A
+                                doubleArrayOf(246.94, 293.66, 369.99, 493.88), // Bm
+                                doubleArrayOf(196.00, 246.94, 293.66, 392.00)  // G
+                            )
+                            val chord = acousticChords[barNum % 4]
+
+                            // Fingerpicked acoustic guitar arpeggios
+                            val pickIdx = ((timeSec / (beatInterval / 2.0)).toInt()) % 4
+                            val pickFreq = chord[pickIdx]
+                            val pickT = timeSec % (beatInterval / 2.0)
+                            val pickEnv = max(0.0, 1.0 - pickT * 4.5)
+                            val pluck = (sin(2.0 * Math.PI * pickFreq * timeSec) + 0.3 * sin(2.0 * Math.PI * pickFreq * 2.0 * timeSec)) * pickEnv * 0.28
+
+                            // Warm upright bass
+                            val bassFreq = chord[0] / 2.0
+                            val bass = sin(2.0 * Math.PI * bassFreq * timeSec) * 0.20
+
+                            // Shaker percussion on 8th notes
+                            val shakerT = timeSec % (beatInterval / 2.0)
+                            val shaker = sin(timeSec * 14200.0) * max(0.0, 1.0 - shakerT * 18.0) * 0.08
+
+                            // Gentle pan stereo bounce
+                            val pan = if (pickIdx % 2 == 0) 0.8 to 1.2 else 1.2 to 0.8
+                            leftSample = pluck * pan.first + bass + shaker
+                            rightSample = pluck * pan.second + bass + shaker
+                        }
+
+                        isCinematic -> {
+                            // Epic Cinematic Soundscape: 72 BPM in D minor (Dm - Bb - F - C)
+                            val cinChords = listOf(
+                                doubleArrayOf(146.83, 174.61, 220.00, 293.66), // Dm
+                                doubleArrayOf(116.54, 146.83, 174.61, 233.08), // Bb
+                                doubleArrayOf(174.61, 220.00, 261.63, 349.23), // F
+                                doubleArrayOf(130.81, 164.81, 196.00, 261.63)  // C
+                            )
+                            val chord = cinChords[barNum % 4]
+
+                            // Deep brass swell
+                            val brassFreq = chord[0] / 2.0
+                            val brass = (sin(2.0 * Math.PI * brassFreq * timeSec) + 0.4 * sin(2.0 * Math.PI * (brassFreq * 2.0) * timeSec)) * 0.25
+
+                            // Staccato 16th-note string ostinato
+                            val ostIdx = ((timeSec / (beatInterval / 4.0)).toInt()) % 4
+                            val ostFreq = chord[ostIdx]
+                            val ostT = timeSec % (beatInterval / 4.0)
+                            val ostEnv = max(0.0, 1.0 - ostT * 12.0)
+                            val stringOst = sin(2.0 * Math.PI * ostFreq * timeSec) * ostEnv * 0.20
+
+                            // Massive cinematic boom impact every 4 bars
+                            var boom = 0.0
+                            if (barNum % 4 == 0 && currentBeat == 0 && beatTime in 0.0..0.8) {
+                                val bFreq = 90.0 * max(0.0, 1.0 - beatTime * 1.5) + 35.0
+                                boom = sin(2.0 * Math.PI * bFreq * beatTime) * max(0.0, 1.0 - beatTime / 0.8) * 0.45
+                            }
+
+                            leftSample = brass * 0.9 + stringOst * 1.1 + boom
+                            rightSample = brass * 1.1 + stringOst * 0.9 + boom
+                        }
+
+                        isPop -> {
+                            // Groovy Pop Beat: 120 BPM in C major (C - G - Am - F)
+                            val popChords = listOf(
+                                doubleArrayOf(261.63, 329.63, 392.00), // C
+                                doubleArrayOf(196.00, 246.94, 293.66), // G
+                                doubleArrayOf(220.00, 261.63, 329.63), // Am
+                                doubleArrayOf(174.61, 220.00, 261.63)  // F
+                            )
+                            val chord = popChords[barNum % 4]
+
+                            // Funky slap bass
+                            val bassFreq = chord[0] / 2.0
+                            val bass = sin(2.0 * Math.PI * bassFreq * timeSec) * 0.28
+
+                            // Pop chord stabs
+                            val stabEnv = max(0.0, 1.0 - (beatTime % (beatInterval / 2.0)) * 6.0)
+                            var stabs = 0.0
+                            for (f in chord) { stabs += sin(2.0 * Math.PI * f * timeSec) * 0.08 }
+                            stabs *= stabEnv
+
+                            // Kick and Claps
+                            var drum = 0.0
+                            if (currentBeat == 0 && beatTime in 0.0..0.12) {
+                                drum += sin(2.0 * Math.PI * 75.0 * beatTime) * (1.0 - beatTime / 0.12) * 0.40
+                            }
+                            if (currentBeat == 2 && beatTime in 0.0..0.10) {
+                                drum += sin(timeSec * 9840.0) * (1.0 - beatTime / 0.10) * 0.25
+                            }
+
+                            leftSample = bass + stabs + drum
+                            rightSample = bass + stabs + drum
+                        }
+
+                        isPiano -> {
+                            // Emotional Piano Ballad: 68 BPM in F major (F - Dm - Bb - C)
+                            val pianoChords = listOf(
+                                doubleArrayOf(174.61, 220.00, 261.63, 349.23), // F
+                                doubleArrayOf(146.83, 174.61, 220.00, 293.66), // Dm
+                                doubleArrayOf(116.54, 146.83, 174.61, 233.08), // Bb
+                                doubleArrayOf(130.81, 164.81, 196.00, 261.63)  // C
+                            )
+                            val chord = pianoChords[barNum % 4]
+
+                            // Flowing left-hand arpeggios
+                            val noteIdx = ((timeSec / (beatInterval / 2.0)).toInt()) % 4
+                            val pf = chord[noteIdx]
+                            val pT = timeSec % (beatInterval / 2.0)
+                            val pEnv = max(0.0, 1.0 - pT * 1.8)
+                            val pianoNote = (sin(2.0 * Math.PI * pf * timeSec) + 0.35 * sin(2.0 * Math.PI * pf * 2.0 * timeSec) + 0.15 * sin(2.0 * Math.PI * pf * 3.0 * timeSec)) * pEnv * 0.32
+
+                            leftSample = pianoNote * 0.95
+                            rightSample = pianoNote * 1.05
+                        }
+
+                        else -> {
+                            // Algorithmic procedurally generated unique track based on track title hash
+                            val seed = Math.abs(titleLower.hashCode())
+                            val basePitch = 130.81 * (1.0 + (seed % 12) * 0.05946) // Tuned to chromatic pitch class
+                            val chordMultiplier = if (seed % 2 == 0) doubleArrayOf(1.0, 1.25, 1.5) else doubleArrayOf(1.0, 1.2, 1.5)
+                            val noteStep = ((timeSec / (beatInterval / 2.0)).toInt()) % 3
+                            val noteFreq = basePitch * chordMultiplier[noteStep] * 2.0
+
+                            val melody = sin(2.0 * Math.PI * noteFreq * timeSec) * 0.22
+                            val bass = sin(2.0 * Math.PI * basePitch * timeSec) * 0.25
+                            val kick = if (currentBeat == 0 && beatTime in 0.0..0.12) sin(2.0 * Math.PI * 70.0 * beatTime) * (1.0 - beatTime / 0.12) * 0.35 else 0.0
+
+                            leftSample = melody + bass + kick
+                            rightSample = melody * 1.1 + bass + kick
+                        }
                     }
 
-                    // Gentle kick/snare pulse every 0.5s
-                    val beatTime = timeSec % 0.5
-                    if (beatTime < 0.08) {
-                        sampleValue += sin(2.0 * Math.PI * 60.0 * beatTime) * (1.0 - beatTime / 0.08) * 0.25
-                    }
+                    val intLeft = (leftSample.coerceIn(-0.95, 0.95) * 32767.0).toInt().coerceIn(-32768, 32767)
+                    val intRight = (rightSample.coerceIn(-0.95, 0.95) * 32767.0).toInt().coerceIn(-32768, 32767)
 
-                    val intSample = (sampleValue * 32767.0).toInt().coerceIn(-32768, 32767)
-
-                    // Left channel
-                    chunk[chunkOffset] = (intSample and 0xFF).toByte()
-                    chunk[chunkOffset + 1] = ((intSample shr 8) and 0xFF).toByte()
-                    // Right channel
-                    chunk[chunkOffset + 2] = (intSample and 0xFF).toByte()
-                    chunk[chunkOffset + 3] = ((intSample shr 8) and 0xFF).toByte()
+                    chunk[chunkOffset] = (intLeft and 0xFF).toByte()
+                    chunk[chunkOffset + 1] = ((intLeft shr 8) and 0xFF).toByte()
+                    chunk[chunkOffset + 2] = (intRight and 0xFF).toByte()
+                    chunk[chunkOffset + 3] = ((intRight shr 8) and 0xFF).toByte()
 
                     chunkOffset += 4
                     sampleIdx++
@@ -1210,6 +1482,15 @@ object VideoMusicRemixerEngine {
             val header = createWavHeader(outputFile.length() - 44, sampleRate, channels, bitsPerSample)
             raf.write(header)
         }
+        return true
+    }
+
+    private fun generateSyntheticMusicWav(
+        outputFile: File,
+        durationMs: Long,
+        onProgress: (Float) -> Unit
+    ) {
+        generateDistinctMusicWav(outputFile, "Ambient Track", durationMs, onProgress)
     }
 
     private fun createWavHeader(

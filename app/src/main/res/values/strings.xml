@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AI Audiobook Generator</string>
+    <string name="app_name">Licensed Music Remix</string>
     <string name="dashboard_title">Audiobook Generator</string>
     <string name="book_title_label">Book Title</string>
     <string name="author_name_label">Author Name</string>

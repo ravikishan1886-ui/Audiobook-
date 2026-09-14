@@ -1,6 +1,6 @@
 {
-  "name": "AI Audiobook Generator",
-  "description": "Full-stack AI audiobook generator powered by Gemini & OpenAI for narration cleanup, chapter splitting, and high-fidelity speech synthesis via OpenAI Neural TTS & cvoice.ai with direct audio playback, download, and YouTube export.",
+  "name": "Licensed Music Remix",
+  "description": "Web application for remixing user videos with licensed audio tracks, YouTube metadata lookup via YouTube Data API v3, audio controls, and FFmpeg video processing.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

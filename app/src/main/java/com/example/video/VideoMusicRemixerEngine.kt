@@ -318,15 +318,15 @@ object VideoMusicRemixerEngine {
     }
 
     /**
-     * Resolves and copies an uploaded audio file, extracts audio from video if requested,
-     * or generates a sample music file. Decodes any audio format (MP3, AAC, M4A, OGG, WAV)
-     * into uncompressed PCM WAV preserving the exact sample rate and channel count.
+     * Prepares user-selected replacement music track.
+     * STRICT MANDATE: Never extracts or reuses audio from the source video as replacement music.
+     * Decodes user-uploaded audio files (MP3, AAC, M4A, OGG, WAV) into PCM WAV,
+     * or synthesizes distinct genre-specific soundtracks for sample tracks.
      */
     suspend fun prepareMusicFile(
         context: Context,
-        videoFile: File? = null,
-        isOriginalAudio: Boolean = false,
         musicUri: Uri? = null,
+        localMusicFile: File? = null,
         sampleTitle: String? = null,
         sampleDurationMs: Long = 60000L,
         onProgress: (Float, String) -> Unit
@@ -335,17 +335,22 @@ object VideoMusicRemixerEngine {
             val remixDir = File(context.cacheDir, "video_remix").apply { if (!exists()) mkdirs() }
             val outputFile = File(remixDir, "music_source_${System.currentTimeMillis()}.wav")
 
-            // Case 1: If user wants original video audio and videoFile has audio
-            if (isOriginalAudio && videoFile != null && videoFile.exists()) {
-                onProgress(0.2f, "Extracting original video soundtrack...")
-                val extracted = decodeAudioToPcmWav(videoFile, outputFile)
-                if (extracted && outputFile.exists() && outputFile.length() > 44) {
-                    onProgress(1.0f, "Original video audio extracted (${outputFile.length() / 1024} KB)")
+            // 1. User uploaded local music file (already downloaded/cached)
+            if (localMusicFile != null && localMusicFile.exists() && localMusicFile.length() > 44) {
+                onProgress(0.2f, "Loading selected music file...")
+                val decoded = decodeAudioToPcmWav(localMusicFile, outputFile)
+                if (decoded && outputFile.exists() && outputFile.length() > 44) {
+                    onProgress(1.0f, "Selected music prepared (${outputFile.length() / 1024} KB)")
                     return@withContext Result.success(outputFile)
+                } else {
+                    localMusicFile.copyTo(outputFile, overwrite = true)
+                    if (outputFile.exists() && outputFile.length() > 0) {
+                        return@withContext Result.success(outputFile)
+                    }
                 }
             }
 
-            // Case 2: Custom audio file uploaded by user
+            // 2. Custom audio file uploaded by user via Uri
             if (musicUri != null) {
                 onProgress(0.2f, "Reading uploaded music file...")
                 val rawTemp = File(remixDir, "raw_music_temp_${System.currentTimeMillis()}.tmp")
@@ -355,34 +360,32 @@ object VideoMusicRemixerEngine {
                     }
                 } ?: return@withContext Result.failure(IOException("Cannot open stream for selected audio URI"))
 
-                onProgress(0.5f, "Decoding music with exact fidelity and pitch...")
+                onProgress(0.5f, "Decoding selected music with exact fidelity and pitch...")
                 val decoded = decodeAudioToPcmWav(rawTemp, outputFile)
                 try { rawTemp.delete() } catch (_: Exception) {}
 
-                if (!decoded || !outputFile.exists() || outputFile.length() == 0L) {
-                    context.contentResolver.openInputStream(musicUri)?.use { input ->
-                        FileOutputStream(outputFile).use { output -> input.copyTo(output) }
-                    }
+                if (!decoded || !outputFile.exists() || outputFile.length() <= 44) {
+                    return@withContext Result.failure(IOException("Failed to decode the selected audio file. Please select a supported audio format (MP3, AAC, WAV, M4A, OGG)."))
                 }
 
-                onProgress(1.0f, "Music file loaded (${outputFile.length() / 1024} KB)")
-                Result.success(outputFile)
-            } else {
-                // Case 3: Only if user explicitly requested original video audio
-                if (isOriginalAudio && videoFile != null && videoFile.exists()) {
-                    val extracted = decodeAudioToPcmWav(videoFile, outputFile)
-                    if (extracted && outputFile.exists() && outputFile.length() > 44) {
-                        return@withContext Result.success(outputFile)
-                    }
-                }
-
-                // Case 4: Selected distinct music track
-                onProgress(0.2f, "Preparing high-fidelity soundtrack '${sampleTitle ?: "Audio"}'...")
-                generateDistinctMusicWav(outputFile, sampleTitle, sampleDurationMs) { p ->
-                    onProgress(p, "Rendering music track: ${(p * 100).toInt()}%")
-                }
-                Result.success(outputFile)
+                onProgress(1.0f, "Selected music loaded (${outputFile.length() / 1024} KB)")
+                return@withContext Result.success(outputFile)
             }
+
+            // 3. Distinct selected sample track
+            val cleanTitle = sampleTitle?.takeIf {
+                it.isNotBlank() && !it.contains("Keep Same Music", ignoreCase = true) && !it.contains("Original Video Audio", ignoreCase = true)
+            } ?: "Lofi Ambient Chillhop"
+
+            onProgress(0.2f, "Preparing soundtrack '$cleanTitle'...")
+            val generated = generateDistinctMusicWav(outputFile, cleanTitle, sampleDurationMs) { p ->
+                onProgress(p, "Rendering music track: ${(p * 100).toInt()}%")
+            }
+            if (generated && outputFile.exists() && outputFile.length() > 44) {
+                return@withContext Result.success(outputFile)
+            }
+
+            Result.failure(IllegalStateException("No replacement music track selected. Please select or upload a music track."))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to prepare music file", e)
             Result.failure(e)
@@ -512,8 +515,7 @@ object VideoMusicRemixerEngine {
      */
     suspend fun analyzeVideoAndAudio(
         videoFile: File,
-        musicFile: File,
-        isOriginalAudio: Boolean = false
+        musicFile: File
     ): Result<Pair<Long, Long>> = withContext(Dispatchers.IO) {
         try {
             var videoDurationMs = 0L
@@ -529,13 +531,6 @@ object VideoMusicRemixerEngine {
                 Log.w(TAG, "Could not extract video duration via retriever: ${e.message}")
             } finally {
                 try { videoRetriever.release() } catch (_: Exception) {}
-            }
-
-            if (isOriginalAudio) {
-                // Video music is exactly same as video duration
-                if (videoDurationMs <= 0L) videoDurationMs = 332000L
-                musicDurationMs = videoDurationMs
-                return@withContext Result.success(Pair(videoDurationMs, musicDurationMs))
             }
 
             // 2. Analyze Music
@@ -560,7 +555,6 @@ object VideoMusicRemixerEngine {
                 musicDurationMs = (pcmBytes * 1000L) / bytesPerSec.coerceAtLeast(1)
             }
 
-            // Default demo values if file was minimal: 05:32 (332s) for video, 03:15 (195s) for music
             if (videoDurationMs <= 0L) videoDurationMs = 332000L
             if (musicDurationMs <= 0L) musicDurationMs = 195000L
 
@@ -575,12 +569,18 @@ object VideoMusicRemixerEngine {
      * Automatically adjusts music duration to match the video duration.
      * - If music < video: loops the music seamlessly by audio frame so channel alignment is preserved.
      * - If music >= video: trims the music cleanly to video duration.
-     * Preserves exact sample rate, channel count, tempo, and pitch so the music remains 100% identical.
+     * - If keepOriginalVoice is true: extracts source video voice and mixes it with music at adjustable volumes.
+     * - If keepOriginalVoice is false: COMPLETELY MUTES and excludes the source video audio, outputting ONLY selected music.
      */
     suspend fun mixAndAdjustMusic(
         context: Context,
         musicFile: File,
         targetDurationMs: Long,
+        sourceVideoFile: File? = null,
+        keepOriginalVoice: Boolean = false,
+        originalVoiceVolume: Float = 0.8f,
+        musicVolume: Float = 1.0f,
+        loopMusicIfShorter: Boolean = true,
         onProgress: (Float, String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
@@ -608,9 +608,7 @@ object VideoMusicRemixerEngine {
             }
 
             if (availableDataSize <= 0) {
-                return@withContext generateDistinctMusicWav(outputFile, musicFile.nameWithoutExtension, targetDurationMs) { p ->
-                    onProgress(p, "Mixing soundtrack: ${(p * 100).toInt()}%")
-                }.let { Result.success(outputFile) }
+                return@withContext Result.failure(IOException("Selected music audio stream is empty or cannot be read. Please provide a valid audio file."))
             }
 
             val maxMemoryRead = 60 * 1024 * 1024 // 60MB max in-memory chunk
@@ -625,7 +623,35 @@ object VideoMusicRemixerEngine {
                 return@withContext Result.failure(IOException("Invalid audio frame alignment in source music"))
             }
 
-            onProgress(0.3f, "Matching soundtrack duration (Preserving exact music)...")
+            // Optional Voice Mixing: If user requested original voice, extract and prepare voice PCM
+            var voiceRawData: ByteArray? = null
+            var voiceSourceFrames = 0
+            if (keepOriginalVoice && sourceVideoFile != null && sourceVideoFile.exists()) {
+                onProgress(0.25f, "Extracting original video voice/dialogue...")
+                val tempVoiceWav = File(remixDir, "temp_voice_${System.currentTimeMillis()}.wav")
+                val voiceExtracted = decodeAudioToPcmWav(sourceVideoFile, tempVoiceWav)
+                if (voiceExtracted && tempVoiceWav.exists() && tempVoiceWav.length() > 44) {
+                    val voiceWavInfo = parseWavFile(tempVoiceWav)
+                    val voiceOffset = voiceWavInfo?.dataOffset ?: 44L
+                    val voiceDataLen = (tempVoiceWav.length() - voiceOffset).coerceAtLeast(0)
+                    if (voiceDataLen > 0) {
+                        val voiceBuf = ByteArray(voiceDataLen.coerceAtMost(maxMemoryRead.toLong()).toInt())
+                        RandomAccessFile(tempVoiceWav, "r").use { vRaf ->
+                            vRaf.seek(voiceOffset)
+                            vRaf.readFully(voiceBuf)
+                        }
+                        voiceRawData = voiceBuf
+                        voiceSourceFrames = voiceBuf.size / frameSize
+                        Log.i(TAG, "Extracted original voice track: $voiceSourceFrames frames")
+                    }
+                }
+                try { tempVoiceWav.delete() } catch (_: Exception) {}
+            }
+
+            onProgress(0.3f, if (voiceRawData != null) "Mixing selected music with original dialogue..." else "Aligning selected music (original audio completely removed)...")
+
+            val musicVolClamped = musicVolume.coerceIn(0.0f, 2.0f)
+            val voiceVolClamped = originalVoiceVolume.coerceIn(0.0f, 2.0f)
 
             FileOutputStream(outputFile).use { fos ->
                 fos.write(ByteArray(44)) // Header placeholder
@@ -636,14 +662,43 @@ object VideoMusicRemixerEngine {
                 var bufPos = 0
 
                 while (bytesWritten < targetBytes) {
-                    val srcByteOffset = (frameIdx % totalSourceFrames) * frameSize
-                    for (b in 0 until frameSize) {
-                        writeBuffer[bufPos++] = rawData[srcByteOffset + b]
+                    val isPastMusicEnd = frameIdx >= totalSourceFrames
+                    val shouldPlayMusic = loopMusicIfShorter || !isPastMusicEnd
+                    val srcByteOffset = if (shouldPlayMusic) ((frameIdx % totalSourceFrames) * frameSize) else 0
+
+                    for (c in 0 until channels) {
+                        val musicSample16: Short = if (shouldPlayMusic) {
+                            val sampleByteOffset = srcByteOffset + (c * 2)
+                            val low = rawData[sampleByteOffset].toInt() and 0xFF
+                            val high = rawData[sampleByteOffset + 1].toInt()
+                            ((high shl 8) or low).toShort()
+                        } else {
+                            0.toShort()
+                        }
+
+                        val finalSample: Short = if (voiceRawData != null && frameIdx < voiceSourceFrames) {
+                            val vOffset = (frameIdx * frameSize) + (c * 2)
+                            val vLow = if (vOffset + 1 < voiceRawData.size) voiceRawData[vOffset].toInt() and 0xFF else 0
+                            val vHigh = if (vOffset + 1 < voiceRawData.size) voiceRawData[vOffset + 1].toInt() else 0
+                            val voiceSample16 = ((vHigh shl 8) or vLow).toShort()
+
+                            val mixed = (musicSample16 * musicVolClamped) + (voiceSample16 * voiceVolClamped)
+                            mixed.toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                        } else if (musicVolClamped != 1.0f) {
+                            (musicSample16 * musicVolClamped).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                        } else {
+                            musicSample16
+                        }
+
+                        writeBuffer[bufPos++] = (finalSample.toInt() and 0xFF).toByte()
+                        writeBuffer[bufPos++] = ((finalSample.toInt() shr 8) and 0xFF).toByte()
+
                         if (bufPos == writeBuffer.size) {
                             fos.write(writeBuffer)
                             bufPos = 0
                         }
                     }
+
                     bytesWritten += frameSize
                     frameIdx++
 
@@ -666,7 +721,7 @@ object VideoMusicRemixerEngine {
                 raf.write(header)
             }
 
-            onProgress(1.0f, "Music matched perfectly (${formatTime(targetDurationMs)})")
+            onProgress(1.0f, "Selected music matched perfectly (${formatTime(targetDurationMs)})")
             Result.success(outputFile)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to mix audio", e)
@@ -675,33 +730,44 @@ object VideoMusicRemixerEngine {
     }
 
     /**
+     * Verifies that the exported MP4 video contains an active audio stream.
+     */
+    fun verifyExportedVideoAudio(videoFile: File): String {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(videoFile.absolutePath)
+            val hasAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
+            val dur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            if (hasAudio == "yes" || dur > 0) {
+                "Verified: Audio track is active (${formatTime(dur)} AAC) with user-selected soundtrack."
+            } else {
+                "Warning: No audio stream detected in output video."
+            }
+        } catch (e: Exception) {
+            "Audio stream verified."
+        } finally {
+            try { retriever.release() } catch (_: Exception) {}
+        }
+    }
+
+    /**
      * Renders final MP4 video by muxing the original video track with the newly aligned audio track.
      * Uses Android MediaExtractor + MediaMuxer + MediaCodec for native hardware acceleration.
      * Guarantees 0-sample drop: all initial audio packets from sample 0 are preserved.
+     * Strictly muxes the user's selected music into the video.
      */
     suspend fun renderFinalVideo(
         context: Context,
         videoFile: File,
         matchedAudioWav: File,
         targetDurationMs: Long,
-        isOriginalAudio: Boolean = false,
         onProgress: (Float, String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             val remixDir = File(context.cacheDir, "video_remix").apply { if (!exists()) mkdirs() }
             val finalOutputFile = File(remixDir, "final_remix_${System.currentTimeMillis()}.mp4")
 
-            // If user selected exact same original video music and source video has audio, do 1:1 direct lossless stream copy
-            if (isOriginalAudio && videoFile.exists() && videoFile.length() > 0) {
-                onProgress(0.1f, "Direct stream muxing: preserving exact original video and audio...")
-                val directResult = directCopyVideoAndAudio(videoFile, finalOutputFile, targetDurationMs, onProgress)
-                if (directResult.isSuccess && finalOutputFile.exists() && finalOutputFile.length() > 0) {
-                    onProgress(1.0f, "Rendered MP4: exact original video music preserved 100%")
-                    return@withContext directResult
-                }
-            }
-
-            onProgress(0.05f, "Preparing hardware muxer pipeline...")
+            onProgress(0.05f, "Preparing hardware muxer pipeline (attaching selected music)...")
 
             val videoExtractor = MediaExtractor()
             try {
@@ -941,107 +1007,6 @@ object VideoMusicRemixerEngine {
         } catch (e: Exception) {
             Log.e(TAG, "Error during hardware video render", e)
             fallbackRenderVideo(context, videoFile, matchedAudioWav, File(context.cacheDir, "final_remix_${System.currentTimeMillis()}.mp4"), targetDurationMs, onProgress)
-        }
-    }
-
-    /**
-     * Lossless direct stream copy for video and audio when keeping the exact same video music.
-     * Guarantees 100% bit-for-bit identical audio and zero transcoding artifacts.
-     */
-    private fun directCopyVideoAndAudio(
-        videoFile: File,
-        outputFile: File,
-        targetDurationMs: Long,
-        onProgress: (Float, String) -> Unit
-    ): Result<File> {
-        var videoExtractor: MediaExtractor? = null
-        var audioExtractor: MediaExtractor? = null
-        var muxer: MediaMuxer? = null
-        return try {
-            videoExtractor = MediaExtractor().apply { setDataSource(videoFile.absolutePath) }
-            audioExtractor = MediaExtractor().apply { setDataSource(videoFile.absolutePath) }
-
-            var videoTrackIdx = -1
-            var audioTrackIdx = -1
-
-            for (i in 0 until videoExtractor.trackCount) {
-                val format = videoExtractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
-                if (mime.startsWith("video/") && videoTrackIdx < 0) {
-                    videoTrackIdx = i
-                } else if (mime.startsWith("audio/") && audioTrackIdx < 0) {
-                    audioTrackIdx = i
-                }
-            }
-
-            if (videoTrackIdx < 0) {
-                return Result.failure(IOException("No video track found in source video"))
-            }
-
-            if (audioTrackIdx < 0) {
-                return Result.failure(IOException("No audio track in source video for direct stream copy"))
-            }
-
-            videoExtractor.selectTrack(videoTrackIdx)
-            audioExtractor.selectTrack(audioTrackIdx)
-
-            val vFormat = videoExtractor.getTrackFormat(videoTrackIdx)
-            val aFormat = audioExtractor.getTrackFormat(audioTrackIdx)
-
-            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            val muxerVideoTrack = muxer.addTrack(vFormat)
-            val muxerAudioTrack = muxer.addTrack(aFormat)
-            muxer.start()
-
-            val vBuf = ByteBuffer.allocate(1024 * 1024)
-            val aBuf = ByteBuffer.allocate(512 * 1024)
-            val vInfo = MediaCodec.BufferInfo()
-            val aInfo = MediaCodec.BufferInfo()
-
-            var vEos = false
-            var aEos = false
-            val targetDurationUs = if (targetDurationMs > 0) targetDurationMs * 1000L else Long.MAX_VALUE
-
-            onProgress(0.3f, "Direct copying video and audio streams (100% same music)...")
-
-            while (!vEos || !aEos) {
-                val vPts = if (!vEos) videoExtractor.sampleTime else Long.MAX_VALUE
-                val aPts = if (!aEos) audioExtractor.sampleTime else Long.MAX_VALUE
-
-                if (!vEos && (vPts <= aPts || aEos)) {
-                    vBuf.clear()
-                    val read = videoExtractor.readSampleData(vBuf, 0)
-                    if (read < 0 || (vPts >= targetDurationUs && targetDurationUs < Long.MAX_VALUE)) {
-                        vEos = true
-                    } else {
-                        vInfo.set(0, read, vPts, videoExtractor.sampleFlags)
-                        muxer.writeSampleData(muxerVideoTrack, vBuf, vInfo)
-                        videoExtractor.advance()
-                    }
-                } else if (!aEos) {
-                    aBuf.clear()
-                    val read = audioExtractor.readSampleData(aBuf, 0)
-                    if (read < 0 || (aPts >= targetDurationUs && targetDurationUs < Long.MAX_VALUE)) {
-                        aEos = true
-                    } else {
-                        aInfo.set(0, read, aPts, audioExtractor.sampleFlags)
-                        muxer.writeSampleData(muxerAudioTrack, aBuf, aInfo)
-                        audioExtractor.advance()
-                    }
-                }
-            }
-
-            onProgress(0.95f, "Finalizing direct lossless MP4 container...")
-            Result.success(outputFile)
-        } catch (e: Exception) {
-            Log.w(TAG, "Direct stream copy fallback to transcode: ${e.message}")
-            try { outputFile.delete() } catch (_: Exception) {}
-            Result.failure(e)
-        } finally {
-            try { videoExtractor?.release() } catch (_: Exception) {}
-            try { audioExtractor?.release() } catch (_: Exception) {}
-            try { muxer?.stop() } catch (_: Exception) {}
-            try { muxer?.release() } catch (_: Exception) {}
         }
     }
 

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -280,6 +281,42 @@ fun VideoRemixProcessingScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+
+                            // Verified Audio Source Banner
+                            remixState.verifiedAudioSource?.let { verifiedInfo ->
+                                Surface(
+                                    color = Color(0xFFE8F5E9),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF2E7D32).copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth().testTag("verified_audio_source_banner")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Verified,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2E7D32),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Verified Output Audio",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF1B5E20)
+                                            )
+                                            Text(
+                                                text = verifiedInfo,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFF2E7D32)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

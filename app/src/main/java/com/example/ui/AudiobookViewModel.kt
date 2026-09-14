@@ -1290,7 +1290,6 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
 
             _remixState.update {
                 it.copy(
-                    isPreserveOriginalAudio = false,
                     musicFileUri = uri,
                     musicFileName = fileName,
                     musicDurationMs = if (extractedDuration > 0) extractedDuration else 180000L,
@@ -1332,49 +1331,22 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun makeVideoMusicExactlySame() {
-        val currentDur = _remixState.value.originalDurationMs.takeIf { it > 0 } ?: 332000L
+        // Toggles keeping the original voice/audio track alongside music
         _remixState.update { current ->
-            if (current.isPreserveOriginalAudio) {
-                // User toggled it off: switch to popular remix soundtrack
-                current.copy(
-                    isPreserveOriginalAudio = false,
-                    musicFileName = "Lofi Ambient Chillhop",
-                    musicDurationMs = 195000L,
-                    localMusicFile = null,
-                    musicFileUri = null,
-                    youtubeMusicUrl = "",
-                    statusMessage = "Original soundtrack untoggled. Ready to remix with custom music."
-                )
-            } else {
-                current.copy(
-                    isPreserveOriginalAudio = true,
-                    musicFileName = "Original Video Audio (Keep Same Music)",
-                    musicDurationMs = currentDur,
-                    finalDurationMs = currentDur,
-                    musicFileUri = null,
-                    localMusicFile = null,
-                    youtubeMusicUrl = "",
-                    youtubeMusicTitle = null,
-                    youtubeMusicAuthor = null,
-                    youtubeMusicThumbnailUrl = null,
-                    resolvedYouTubeSource = null,
-                    errorMessage = null,
-                    youtubeMusicError = null,
-                    statusMessage = "Using exact same video music (Original soundtrack)"
-                )
-            }
+            val nextKeep = !current.keepOriginalVoice
+            current.copy(
+                keepOriginalVoice = nextKeep,
+                statusMessage = if (nextKeep) "Original voice/dialogue will be kept and mixed with selected music"
+                               else "Original video audio muted completely. Only selected music will play."
+            )
         }
     }
 
     fun selectSampleMusic(sample: SampleMusicOption) {
-        val isOrig = sample.title.contains("Original", ignoreCase = true) || sample.title.contains("Same", ignoreCase = true)
-        val currentDur = _remixState.value.originalDurationMs.takeIf { it > 0 } ?: 332000L
         _remixState.update {
             it.copy(
-                isPreserveOriginalAudio = isOrig,
                 musicFileName = sample.title,
-                musicDurationMs = if (isOrig) currentDur else sample.durationMs,
-                finalDurationMs = if (isOrig) currentDur else it.finalDurationMs,
+                musicDurationMs = sample.durationMs,
                 musicFileUri = null,
                 localMusicFile = null,
                 youtubeMusicUrl = "",
@@ -1384,7 +1356,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 resolvedYouTubeSource = null,
                 errorMessage = null,
                 youtubeMusicError = null,
-                statusMessage = if (isOrig) "Using exact same video music (Original soundtrack)" else "Music selected: ${sample.title}"
+                statusMessage = "Music selected: ${sample.title}"
             )
         }
     }
@@ -1396,7 +1368,6 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             it.copy(
                 youtubeMusicUrl = trimmed,
                 youtubeMusicError = null,
-                isPreserveOriginalAudio = if (!isBlank) false else it.isPreserveOriginalAudio,
                 localMusicFile = null,
                 musicFileUri = null,
                 musicFileName = if (!isBlank) "YouTube Music / Web Audio" else it.musicFileName
@@ -1478,7 +1449,6 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             result.onSuccess { audioResult ->
                 _remixState.update {
                     it.copy(
-                        isPreserveOriginalAudio = false,
                         isFetchingYouTubeMusic = false,
                         musicFileName = if (audioResult.videoId != null) "${audioResult.title} (YouTube Music)" else "${audioResult.title} (Public Music)",
                         musicDurationMs = audioResult.durationMs,
@@ -1503,6 +1473,22 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun setKeepOriginalVoice(keep: Boolean) {
+        _remixState.update { it.copy(keepOriginalVoice = keep) }
+    }
+
+    fun setOriginalVoiceVolume(volume: Float) {
+        _remixState.update { it.copy(originalVoiceVolume = volume.coerceIn(0.0f, 2.0f)) }
+    }
+
+    fun setMusicVolume(volume: Float) {
+        _remixState.update { it.copy(musicVolume = volume.coerceIn(0.0f, 2.0f)) }
+    }
+
+    fun setLoopMusicIfShorter(loop: Boolean) {
+        _remixState.update { it.copy(loopMusicIfShorter = loop) }
+    }
+
     fun setRemixRightsConfirmed(confirmed: Boolean) {
         _remixState.update {
             it.copy(
@@ -1522,13 +1508,9 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             _remixState.update { it.copy(errorMessage = "Please enter or select a video URL first") }
             return
         }
-        if (state.musicFileName.isBlank()) {
-            val defaultName = when {
-                state.youtubeMusicUrl.isNotBlank() -> state.youtubeMusicTitle ?: "YouTube Music / Web Audio"
-                state.musicFileUri != null -> "Local Audio Track"
-                else -> "Original Video Audio (Keep Same Music)"
-            }
-            _remixState.update { it.copy(musicFileName = defaultName) }
+        if (!state.hasSelectedMusic && state.localMusicFile == null && state.musicFileUri == null && state.youtubeMusicUrl.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "No replacement music selected. Please provide a music track or paste a YouTube URL.") }
+            return
         }
         if (!state.hasRightsPermission) {
             _remixState.update { it.copy(errorMessage = "Please confirm permission to use these media files") }
@@ -1559,13 +1541,9 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
             _remixState.update { it.copy(errorMessage = "Please provide a valid video URL") }
             return
         }
-        if (state.musicFileName.isBlank()) {
-            val defaultName = when {
-                state.youtubeMusicUrl.isNotBlank() -> state.youtubeMusicTitle ?: "YouTube Music / Web Audio"
-                state.musicFileUri != null -> "Local Audio Track"
-                else -> "Original Video Audio (Keep Same Music)"
-            }
-            _remixState.update { it.copy(musicFileName = defaultName) }
+        if (!state.hasSelectedMusic && state.localMusicFile == null && state.musicFileUri == null && state.youtubeMusicUrl.isBlank()) {
+            _remixState.update { it.copy(errorMessage = "No replacement music selected. Please select an audio track or paste a YouTube music URL.") }
+            return
         }
         if (!state.hasRightsPermission) {
             _remixState.update { it.copy(errorMessage = "Please confirm legal permission to process this media") }
@@ -1644,28 +1622,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
 
-                val isOriginalAudio = state.isExactSameMusic
-
-                val musicFile: File = if (isOriginalAudio) {
-                    _remixState.update { it.copy(statusMessage = "Preserving exact original video soundtrack...") }
-                    val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
-                        context = context,
-                        videoFile = videoFile,
-                        isOriginalAudio = true,
-                        musicUri = null,
-                        sampleTitle = "Original Video Audio (Keep Same Music)",
-                        sampleDurationMs = state.originalDurationMs,
-                        onProgress = { p, msg ->
-                            _remixState.update {
-                                it.copy(
-                                    progressPercent = 0.20f + p * 0.15f,
-                                    statusMessage = msg
-                                )
-                            }
-                        }
-                    )
-                    musicPrepareResult.getOrThrow()
-                } else if (state.youtubeMusicUrl.isNotBlank()) {
+                val musicFile: File = if (state.youtubeMusicUrl.isNotBlank()) {
                     _remixState.update { it.copy(statusMessage = "Fetching music track from YouTube/Web...") }
                     val cachedMusic = state.localMusicFile
                     if (cachedMusic != null && cachedMusic.exists() && cachedMusic.length() > 44 &&
@@ -1700,8 +1657,6 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     _remixState.update { it.copy(statusMessage = "Decoding uploaded music file...") }
                     val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
                         context = context,
-                        videoFile = videoFile,
-                        isOriginalAudio = false,
                         musicUri = state.musicFileUri,
                         sampleTitle = state.musicFileName,
                         sampleDurationMs = state.musicDurationMs,
@@ -1715,25 +1670,10 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     )
                     musicPrepareResult.getOrThrow()
+                } else if (state.localMusicFile != null && state.localMusicFile.exists() && state.localMusicFile.length() > 44) {
+                    state.localMusicFile
                 } else {
-                    _remixState.update { it.copy(statusMessage = "Rendering distinct music track '${state.musicFileName}'...") }
-                    val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
-                        context = context,
-                        videoFile = videoFile,
-                        isOriginalAudio = false,
-                        musicUri = null,
-                        sampleTitle = state.musicFileName,
-                        sampleDurationMs = state.musicDurationMs,
-                        onProgress = { p, msg ->
-                            _remixState.update {
-                                it.copy(
-                                    progressPercent = 0.20f + p * 0.15f,
-                                    statusMessage = msg
-                                )
-                            }
-                        }
-                    )
-                    musicPrepareResult.getOrThrow()
+                    throw IllegalStateException("No replacement music track selected. Please select an audio file or provide a valid YouTube music link.")
                 }
 
                 _remixState.update {
@@ -1752,9 +1692,9 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
 
-                val analysisResult = VideoMusicRemixerEngine.analyzeVideoAndAudio(videoFile, musicFile, isOriginalAudio)
+                val analysisResult = VideoMusicRemixerEngine.analyzeVideoAndAudio(videoFile, musicFile)
                 val (videoDurMs, rawMusicDurMs) = analysisResult.getOrDefault(Pair(state.originalDurationMs, state.musicDurationMs))
-                val musicDurMs = if (isOriginalAudio) videoDurMs else rawMusicDurMs
+                val musicDurMs = rawMusicDurMs
                 val finalDurMs = videoDurMs // Matched to video duration!
 
                 _remixState.update {
@@ -1764,8 +1704,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                         finalDurationMs = finalDurMs,
                         stepStatuses = it.stepStatuses + (RemixPipelineStep.VIDEO_ANALYZED to PipelineStepStatus.COMPLETED),
                         progressPercent = 0.45f,
-                        statusMessage = if (isOriginalAudio) "Video & Music durations exactly matched (${VideoMusicRemixerEngine.formatTime(finalDurMs)})"
-                                       else "Video analyzed (Original: ${VideoMusicRemixerEngine.formatTime(videoDurMs)}, Music: ${VideoMusicRemixerEngine.formatTime(musicDurMs)})"
+                        statusMessage = "Video analyzed (Duration: ${VideoMusicRemixerEngine.formatTime(videoDurMs)}, Music: ${VideoMusicRemixerEngine.formatTime(musicDurMs)})"
                     )
                 }
 
@@ -1774,8 +1713,8 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     it.copy(
                         currentStep = RemixPipelineStep.MIXING_AUDIO,
                         stepStatuses = it.stepStatuses + (RemixPipelineStep.MIXING_AUDIO to PipelineStepStatus.IN_PROGRESS),
-                        statusMessage = if (isOriginalAudio) "Syncing exact audio track (${VideoMusicRemixerEngine.formatTime(finalDurMs)})..."
-                                       else "Mixing audio: adjusting music duration to match ${VideoMusicRemixerEngine.formatTime(finalDurMs)}..."
+                        statusMessage = if (state.keepOriginalVoice) "Mixing selected music with original video dialogue..."
+                                       else "Applying selected music (original audio completely removed)..."
                     )
                 }
 
@@ -1783,6 +1722,11 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     context = context,
                     musicFile = musicFile,
                     targetDurationMs = finalDurMs,
+                    sourceVideoFile = videoFile,
+                    keepOriginalVoice = state.keepOriginalVoice,
+                    originalVoiceVolume = state.originalVoiceVolume,
+                    musicVolume = state.musicVolume,
+                    loopMusicIfShorter = state.loopMusicIfShorter,
                     onProgress = { p, msg ->
                         _remixState.update {
                             it.copy(
@@ -1807,7 +1751,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     it.copy(
                         currentStep = RemixPipelineStep.RENDERING_VIDEO,
                         stepStatuses = it.stepStatuses + (RemixPipelineStep.RENDERING_VIDEO to PipelineStepStatus.IN_PROGRESS),
-                        statusMessage = if (isOriginalAudio) "Direct stream muxing MP4 (100% same video music)..." else "Rendering final MP4 with hardware MediaMuxer..."
+                        statusMessage = "Rendering final MP4 with hardware MediaMuxer (applying selected music)..."
                     )
                 }
 
@@ -1816,7 +1760,6 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     videoFile = videoFile,
                     matchedAudioWav = matchedAudioWav,
                     targetDurationMs = finalDurMs,
-                    isOriginalAudio = isOriginalAudio,
                     onProgress = { p, msg ->
                         _remixState.update {
                             it.copy(
@@ -1828,12 +1771,15 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 )
 
                 val renderedMp4 = renderResult.getOrThrow()
+                val verificationMsg = VideoMusicRemixerEngine.verifyExportedVideoAudio(renderedMp4)
 
                 _remixState.update {
                     it.copy(
                         renderedMp4File = renderedMp4,
+                        verifiedAudioSource = "Music source: ${state.musicFileName} | Original audio: ${if (state.keepOriginalVoice) "ON (${(state.originalVoiceVolume * 100).toInt()}%)" else "OFF"}",
                         stepStatuses = it.stepStatuses + (RemixPipelineStep.RENDERING_VIDEO to PipelineStepStatus.COMPLETED),
-                        progressPercent = 0.85f
+                        progressPercent = 0.85f,
+                        statusMessage = verificationMsg
                     )
                 }
 

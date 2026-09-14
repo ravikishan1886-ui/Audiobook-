@@ -356,18 +356,9 @@ object YouTubeAudioExtractor {
                 }
             }
 
-            // If online streaming is blocked by YouTube bot protection, return info with null streamUrl
-            // fetchAndDecodePublicMusic will seamlessly produce the high-fidelity track
-            Result.success(
-                YouTubeVideoInfo(
-                    videoId = videoId,
-                    title = videoTitle,
-                    author = videoAuthor,
-                    durationSeconds = durationSeconds,
-                    streamUrl = null,
-                    mimeType = null,
-                    itag = 0
-                )
+            // If online streaming is blocked by YouTube or no stream found, return informative failure
+            Result.failure(
+                IOException("Direct audio extraction is unavailable for this YouTube video. Please upload the audio file (MP3, WAV, M4A) or provide a direct audio source.")
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving YouTube audio: ${e.message}", e)
@@ -608,30 +599,10 @@ object YouTubeAudioExtractor {
                     }
                 }
 
-                // Resilient Fallback: Synthesize matching high-fidelity studio remix WAV unique to this track
-                onProgress(0.60f, "Preparing soundtrack for '${info.title.take(28)}'...")
-                val durationSec = if (info.durationSeconds > 0) info.durationSeconds.toInt().coerceIn(30, 300) else 198
-                val synthesized = VideoMusicRemixerEngine.generateDistinctMusicWav(
-                    outputFile = pcmWav,
-                    trackTitle = "${info.title} ${info.author}",
-                    durationMs = durationSec * 1000L,
-                    onProgress = { p -> onProgress(0.60f + p * 0.35f, "Preparing audio: ${(p * 100).toInt()}%") }
+                // If stream was not found or direct download failed, do NOT generate synthetic music!
+                return@withContext Result.failure(
+                    IOException("The YouTube URL cannot legally/technically be used to obtain the audio stream. Please upload the audio file (MP3, WAV, M4A) or provide a properly licensed audio source instead.")
                 )
-
-                if (synthesized && pcmWav.exists() && pcmWav.length() > 44) {
-                    onProgress(1.0f, "YouTube audio loaded: ${info.title.take(28)}")
-                    return@withContext Result.success(
-                        YouTubeAudioResult(
-                            videoId = videoId,
-                            title = info.title,
-                            author = info.author,
-                            durationMs = durationSec * 1000L,
-                            pcmWavFile = pcmWav
-                        )
-                    )
-                }
-
-                return@withContext Result.failure(IOException("Could not load audio for YouTube video: ${info.title}"))
             }
 
             // Case 2: Direct Public Audio Stream / File URL (MP3, WAV, M4A, OGG, AAC, etc.)

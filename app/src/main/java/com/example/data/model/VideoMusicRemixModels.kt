@@ -54,7 +54,7 @@ data class YouTubeSourceInfo(
 data class VideoMusicRemixState(
     val currentView: RemixViewMode = RemixViewMode.INPUT,
     val videoUrl: String = "",
-    val musicFileName: String = "Original Video Audio (Keep Same Music)",
+    val musicFileName: String = "Lofi Ambient Chillhop",
     val musicFileUri: Uri? = null,
     val localMusicFile: File? = null,
     val youtubeMusicUrl: String = "",
@@ -94,23 +94,29 @@ data class VideoMusicRemixState(
     val youtubeVideoId: String? = null,
     val youtubeVideoUrl: String? = null,
     val isSavedToGallery: Boolean = false,
-    val isPreserveOriginalAudio: Boolean = false
+
+    // Original Voice Option: Keep original voice mixed with replacement music
+    val keepOriginalVoice: Boolean = false,
+    val originalVoiceVolume: Float = 0.8f,
+    val musicVolume: Float = 1.0f,
+    val loopMusicIfShorter: Boolean = true,
+    val verifiedAudioSource: String? = null
 ) {
+    val hasSelectedMusic: Boolean
+        get() = musicFileUri != null || youtubeMusicUrl.isNotBlank() || (musicFileName.isNotBlank() && !musicFileName.contains("Keep Same Music", ignoreCase = true))
+
+    // Kept for backward compatibility if referenced anywhere
     val isExactSameMusic: Boolean
-        get() = (isPreserveOriginalAudio ||
-                ((musicFileName.contains("Original Video Audio", ignoreCase = true) ||
-                  musicFileName.contains("Keep Same Music", ignoreCase = true)))) &&
-                musicFileUri == null &&
-                youtubeMusicUrl.isBlank() &&
-                (musicFileName.contains("Original Video Audio", ignoreCase = true) ||
-                 musicFileName.contains("Keep Same Music", ignoreCase = true) ||
-                 musicFileName.isBlank())
+        get() = false
+
+    val isPreserveOriginalAudio: Boolean
+        get() = keepOriginalVoice
 
     val formattedOriginalDuration: String
         get() = formatDuration(originalDurationMs)
 
     val formattedMusicDuration: String
-        get() = if (isExactSameMusic) formatDuration(originalDurationMs) else formatDuration(musicDurationMs)
+        get() = formatDuration(musicDurationMs)
 
     val formattedFinalDuration: String
         get() = formatDuration(finalDurationMs)

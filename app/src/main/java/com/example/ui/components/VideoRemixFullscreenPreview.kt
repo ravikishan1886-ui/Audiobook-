@@ -307,11 +307,104 @@ fun VideoRemixFullscreenPreview(
                     }
                 }
 
+                // Pre-Export Audio Validation Card
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("fullscreen_preview_validation_card")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Validation Before Export",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Music source:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = remixState.musicFileName.ifBlank { "[No track selected]" }.take(32),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.testTag("validation_preview_music_source")
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Original audio:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (remixState.keepOriginalVoice) "ON (Mixed at ${(remixState.originalVoiceVolume * 100).toInt()}%)" else "OFF (Completely removed)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (remixState.keepOriginalVoice) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32),
+                                modifier = Modifier.testTag("validation_preview_original_audio")
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Audio looping:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (remixState.loopMusicIfShorter) "ON (Loop if shorter)" else "OFF (Play once)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
                 // Music Synchronization / Adjustment Explanation Card
                 Surface(
-                    color = if (remixState.isExactSameMusic) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
                     shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, if (remixState.isExactSameMusic) Color(0xFF2E7D32).copy(alpha = 0.4f) else Color.Transparent),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -322,25 +415,22 @@ fun VideoRemixFullscreenPreview(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = if (remixState.isExactSameMusic) Icons.Filled.CheckCircle else Icons.Filled.AutoFixHigh,
+                            imageVector = Icons.Filled.Audiotrack,
                             contentDescription = null,
-                            tint = if (remixState.isExactSameMusic) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Column {
                             Text(
-                                text = if (remixState.isExactSameMusic) "100% Exact Same Video Music" else "Automatic Music Duration Adjustment",
+                                text = "Preserve Original Audio Characteristics",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (remixState.isExactSameMusic) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (remixState.isExactSameMusic)
-                                    "The video soundtrack and music are exactly the same (${remixState.formattedFinalDuration}). The audio is preserved 1:1 without alteration, pitch shift, or lossy transcoding."
-                                else
-                                    "Because the music (${remixState.formattedMusicDuration}) is different from the video (${remixState.formattedOriginalDuration}), the audio engine seamlessly adjusts the track to match exactly ${remixState.formattedFinalDuration}.",
+                                text = "Audio track is used exactly as provided — no pitch shift, speed changes, or AI alterations. The track is trimmed to video duration (${remixState.formattedFinalDuration})${if (remixState.loopMusicIfShorter) " or looped if shorter" else ""}.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (remixState.isExactSameMusic) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

@@ -208,6 +208,10 @@ fun AudiobookDashboard(
                     onFetchYouTubeMusic = { viewModel.fetchYouTubeMusic(it) },
                     onUseThisMusic = { viewModel.selectResolvedYouTubeMusic() },
                     onMakeVideoMusicSame = { viewModel.makeVideoMusicExactlySame() },
+                    onKeepOriginalVoiceChange = { viewModel.setKeepOriginalVoice(it) },
+                    onOriginalVoiceVolumeChange = { viewModel.setOriginalVoiceVolume(it) },
+                    onMusicVolumeChange = { viewModel.setMusicVolume(it) },
+                    onLoopMusicChange = { viewModel.setLoopMusicIfShorter(it) },
                     onRightsConfirmedChange = { viewModel.setRemixRightsConfirmed(it) },
                     onNextToPreview = { viewModel.openFullscreenPreview() },
                     onDirectRemixNow = { viewModel.startVideoProcessing() }

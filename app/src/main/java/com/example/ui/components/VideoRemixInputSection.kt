@@ -73,12 +73,6 @@ val SAMPLE_VIDEOS = listOf(
 
 val SAMPLE_MUSICS = listOf(
     SampleMusicOption(
-        title = "Original Video Audio (Keep Same Music)",
-        durationLabel = "Original",
-        durationMs = 0L,
-        genre = "Original Video Soundtrack"
-    ),
-    SampleMusicOption(
         title = "Lofi Ambient Chillhop",
         durationLabel = "03:15",
         durationMs = 195000L,
@@ -183,6 +177,10 @@ fun VideoRemixInputSection(
     onFetchYouTubeMusic: (String?) -> Unit = {},
     onUseThisMusic: () -> Unit = { onFetchYouTubeMusic(null) },
     onMakeVideoMusicSame: () -> Unit = {},
+    onKeepOriginalVoiceChange: (Boolean) -> Unit = {},
+    onOriginalVoiceVolumeChange: (Float) -> Unit = {},
+    onMusicVolumeChange: (Float) -> Unit = {},
+    onLoopMusicChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -408,89 +406,200 @@ fun VideoRemixInputSection(
                     }
                 }
 
-                // Dedicated "Make Video Music Exactly Same" Quick Selector Card
-                val isSameMusicActive = remixState.isExactSameMusic
+                // Original Voice Option & Audio Mixing Card
+                val keepVoice = remixState.keepOriginalVoice
                 Surface(
-                    color = if (isSameMusicActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    color = if (keepVoice) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(
                         1.5.dp,
-                        if (isSameMusicActive) MaterialTheme.colorScheme.primary
+                        if (keepVoice) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("card_make_video_music_same")
+                        .testTag("card_original_voice_control")
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.size(40.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isSameMusicActive) Icons.Filled.Check else Icons.Filled.Sync,
-                                    contentDescription = null,
-                                    tint = if (isSameMusicActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = "Make Video Music Exactly Same",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                                if (isSameMusicActive) {
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "ACTIVE",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (keepVoice) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (keepVoice) Icons.Filled.Mic else Icons.Filled.MicOff,
+                                            contentDescription = null,
+                                            tint = if (keepVoice) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
+                                Column {
+                                    Text(
+                                        text = "Keep Original Voice / Dialogue",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (keepVoice) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (keepVoice) "Preserves dialogue and mixes with selected music"
+                                               else "Source audio removed (Selected music only)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                            Text(
-                                text = if (isSameMusicActive)
-                                    "✓ Original video audio preserved 1:1 without alteration or transcoding"
-                                else
-                                    "Keep original video soundtrack 100% identical in duration and audio",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Switch(
+                                checked = keepVoice,
+                                onCheckedChange = onKeepOriginalVoiceChange,
+                                modifier = Modifier.testTag("switch_keep_original_voice")
                             )
                         }
 
-                        Button(
-                            onClick = onMakeVideoMusicSame,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSameMusicActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = if (isSameMusicActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.testTag("btn_make_video_music_same")
+                        if (keepVoice) {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                            // Original Voice Volume Slider
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Original Voice Volume",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${(remixState.originalVoiceVolume * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Slider(
+                                    value = remixState.originalVoiceVolume,
+                                    onValueChange = onOriginalVoiceVolumeChange,
+                                    valueRange = 0.0f..2.0f,
+                                    modifier = Modifier.testTag("slider_original_voice_volume")
+                                )
+                            }
+
+                            // Selected Music Volume Slider
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Selected Music Volume",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${(remixState.musicVolume * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Slider(
+                                    value = remixState.musicVolume,
+                                    onValueChange = onMusicVolumeChange,
+                                    valueRange = 0.0f..2.0f,
+                                    modifier = Modifier.testTag("slider_music_volume")
+                                )
+                            }
+                        } else {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.VolumeOff,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Original audio from source video is completely removed. Only the selected music will play.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        // Loop Music If Shorter Option
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = if (isSameMusicActive) "Selected" else "Set Same",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.labelMedium
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (remixState.loopMusicIfShorter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Repeat,
+                                            contentDescription = null,
+                                            tint = if (remixState.loopMusicIfShorter) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        text = "Loop Music If Shorter Than Video",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (remixState.loopMusicIfShorter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (remixState.loopMusicIfShorter) "Music repeats smoothly if shorter than target video"
+                                               else "Music plays once without looping (stops when track ends)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = remixState.loopMusicIfShorter,
+                                onCheckedChange = onLoopMusicChange,
+                                modifier = Modifier.testTag("switch_loop_music")
                             )
                         }
                     }
@@ -990,7 +1099,7 @@ fun VideoRemixInputSection(
 
                 // Sample music options
                 Text(
-                    text = "Or keep original video audio / royalty-free track:",
+                    text = "Or choose a replacement music soundtrack:",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1002,7 +1111,7 @@ fun VideoRemixInputSection(
                 ) {
                     SAMPLE_MUSICS.forEach { sample ->
                         val isSelected = remixState.musicFileName == sample.title
-                        val labelText = if (sample.title.startsWith("Original")) "🎵 Original Video Audio" else "${sample.title.take(20)} (${sample.durationLabel})"
+                        val labelText = "${sample.title.take(22)} (${sample.durationLabel})"
                         FilterChip(
                             selected = isSelected,
                             onClick = { onSampleMusicSelected(sample) },
@@ -1054,6 +1163,85 @@ fun VideoRemixInputSection(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            // 4. Pre-Export Validation Display
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("pre_export_validation_card")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Pre-Export Configuration",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Music source:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (remixState.musicFileName.isNotBlank()) remixState.musicFileName.take(30) else "[No music selected]",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (remixState.musicFileName.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.testTag("validation_music_source")
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Original audio:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (remixState.keepOriginalVoice) "ON" else "OFF",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (remixState.keepOriginalVoice) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32),
+                            modifier = Modifier.testTag("validation_original_audio")
+                        )
+                    }
+                    if (remixState.loopMusicIfShorter) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Loop music:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "ON (repeats if shorter)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }

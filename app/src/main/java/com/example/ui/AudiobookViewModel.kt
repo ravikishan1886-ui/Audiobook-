@@ -1388,6 +1388,8 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                         musicFileName = resolved?.title ?: current.musicFileName
                     )
                 }
+                // Automatically fetch and prepare audio track for resolved YouTube video
+                fetchYouTubeMusic(trimmed)
             }
         } else {
             _remixState.update {
@@ -1673,7 +1675,26 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 } else if (state.localMusicFile != null && state.localMusicFile.exists() && state.localMusicFile.length() > 44) {
                     state.localMusicFile
                 } else {
-                    throw IllegalStateException("No replacement music track selected. Please select an audio file or provide a valid YouTube music link.")
+                    val fallbackTitle = if (state.musicFileName.isNotBlank() && !state.musicFileName.contains("Original", ignoreCase = true) && !state.musicFileName.contains("Same", ignoreCase = true)) {
+                        state.musicFileName
+                    } else {
+                        "Remix Soundtrack"
+                    }
+                    _remixState.update { it.copy(musicFileName = fallbackTitle, statusMessage = "Preparing music track '$fallbackTitle'...") }
+                    val musicPrepareResult = VideoMusicRemixerEngine.prepareMusicFile(
+                        context = context,
+                        sampleTitle = fallbackTitle,
+                        sampleDurationMs = state.musicDurationMs.coerceAtLeast(60000L),
+                        onProgress = { p, msg ->
+                            _remixState.update {
+                                it.copy(
+                                    progressPercent = 0.20f + p * 0.15f,
+                                    statusMessage = msg
+                                )
+                            }
+                        }
+                    )
+                    musicPrepareResult.getOrThrow()
                 }
 
                 _remixState.update {

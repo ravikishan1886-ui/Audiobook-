@@ -686,6 +686,7 @@ fun VideoRemixInputSection(
                         val isDirectPublicAudio = remember(urlTrimmed, detectedVideoId) {
                             detectedVideoId == null && (urlTrimmed.startsWith("http://", ignoreCase = true) || urlTrimmed.startsWith("https://", ignoreCase = true))
                         }
+                        val hasUsableAudio = (remixState.localMusicFile != null && remixState.localMusicFile.exists() && remixState.localMusicFile.length() > 44) || (remixState.musicFileUri != null)
 
                         if (detectedVideoId != null) {
                             val resolved = remixState.resolvedYouTubeSource
@@ -693,8 +694,7 @@ fun VideoRemixInputSection(
                             val musicAuthor = resolved?.author ?: remixState.youtubeMusicAuthor ?: if (remixState.isResolvingYouTubeSource) "Resolving artist..." else "YouTube Artist / Channel"
                             val thumbUrl = resolved?.thumbnailUrl ?: remixState.youtubeMusicThumbnailUrl ?: "https://i.ytimg.com/vi/$detectedVideoId/hqdefault.jpg"
                             val sourceRefUrl = resolved?.sourceUrl ?: if (isShortsSource) "https://youtube.com/source/$detectedVideoId/shorts" else "https://youtu.be/$detectedVideoId"
-                            val isMusicActive = (remixState.localMusicFile != null || remixState.musicFileName.isNotBlank()) &&
-                                (remixState.musicFileName.contains(musicTitle, ignoreCase = true) || (remixState.youtubeMusicTitle != null && remixState.youtubeMusicTitle == musicTitle))
+                            val isMusicActive = hasUsableAudio && (remixState.youtubeMusicTitle == musicTitle || remixState.musicFileName.contains(musicTitle, ignoreCase = true))
 
                             Card(
                                 shape = RoundedCornerShape(14.dp),
@@ -861,7 +861,7 @@ fun VideoRemixInputSection(
                                             .testTag("use_this_music_button"),
                                         shape = RoundedCornerShape(10.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isMusicActive) Color(0xFF2E7D32) else Color(0xFFCC0000),
+                                            containerColor = if (isMusicActive) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
                                             contentColor = Color.White
                                         )
                                     ) {
@@ -872,15 +872,15 @@ fun VideoRemixInputSection(
                                                 strokeWidth = 2.dp
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Loading & Preparing Music...", fontWeight = FontWeight.Bold)
+                                            Text("Loading & Preparing Audio...", fontWeight = FontWeight.Bold)
                                         } else if (isMusicActive) {
                                             Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("✓ Using this music", fontWeight = FontWeight.Bold)
+                                            Text("✓ Audio Ready & Selected", fontWeight = FontWeight.Bold)
                                         } else {
-                                            Icon(Icons.Filled.MusicNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Use this music", fontWeight = FontWeight.Bold)
+                                            Text("Extract & Use YouTube Music", fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -981,8 +981,8 @@ fun VideoRemixInputSection(
                             }
                         }
 
-                        // YouTube Music Error display if any
-                        if (remixState.youtubeMusicError != null) {
+                        // YouTube Music Error display if any (hidden once audio is ready)
+                        if (remixState.youtubeMusicError != null && !hasUsableAudio) {
                             Surface(
                                 color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
                                 shape = RoundedCornerShape(8.dp),

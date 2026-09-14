@@ -441,6 +441,24 @@ app.get('/api/remix-status/:jobId', (req, res) => {
   res.json(job);
 });
 
+/**
+ * APK Download Endpoints
+ */
+const APK_FILE_PATH = path.join(__dirname, 'APK_DOWNLOAD', 'app-debug.apk');
+const handleApkDownload = (_req, res) => {
+  if (fs.existsSync(APK_FILE_PATH)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="LicensedMusicRemix.apk"');
+    return res.sendFile(APK_FILE_PATH);
+  }
+  return res.status(404).json({ error: 'APK file not found' });
+};
+
+app.get('/download-apk', handleApkDownload);
+app.get('/api/download-apk', handleApkDownload);
+app.get('/app-debug.apk', handleApkDownload);
+app.use('/download', express.static(path.join(__dirname, 'APK_DOWNLOAD')));
+
 // Serve frontend static build in production
 const DIST_DIR = path.join(__dirname, 'dist');
 if (fs.existsSync(DIST_DIR)) {

@@ -5,8 +5,9 @@ Download the compiled Android application package below:
 ### ⬇️ **[Download `app-debug.apk` (Raw)](./app-debug.apk?raw=true)**
 
 - **File**: `app-debug.apk`
-- **Size**: ~22 MB
-- **SHA-256**: `b161f6156b51bfcf3c0e6ec459e4a42ceb357dacb28dd66304f6a05d3a391ce8`
+- **Application**: Licensed Music Remix
+- **Size**: ~23.2 MB (24,367,746 bytes)
+- **SHA-256**: `4eb7afed08ea85d3f8db802f74beabe0d6f631a349ad305ac190b66db8e7ea4c`
 - **Minimum Android**: Android 7.0 (API 24)
 - **Target Android**: Android 14+ / 16 (API 36)
 

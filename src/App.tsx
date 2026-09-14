@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   FileCheck,
   RefreshCw,
-  Info
+  Info,
+  Smartphone
 } from 'lucide-react';
 
 const YouTubeIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -245,9 +246,21 @@ export default function App() {
               <p className="text-xs text-slate-400">YouTube Metadata Lookup &amp; Licensed Audio Video Remixer</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-800/50 px-3 py-1.5 rounded-lg">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Strict Copyright Safe</span>
+          <div className="flex items-center gap-3">
+            <a
+              href="/api/download-apk"
+              download="LicensedMusicRemix.apk"
+              className="flex items-center gap-2 text-xs font-semibold text-sky-300 hover:text-white bg-sky-950/60 hover:bg-sky-900/60 border border-sky-700/60 px-3 py-1.5 rounded-lg transition shadow-sm hover:shadow-sky-500/10"
+              title="Download Android APK (23.2 MB)"
+            >
+              <Smartphone className="w-4 h-4 text-sky-400" />
+              <span>Download Android APK</span>
+              <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-mono">23.2 MB</span>
+            </a>
+            <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-800/50 px-3 py-1.5 rounded-lg">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Strict Copyright Safe</span>
+            </div>
           </div>
         </div>
       </header>

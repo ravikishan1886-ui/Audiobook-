@@ -10,9 +10,9 @@
 | :--- | :--- |
 | **File Name** | `app-debug.apk` |
 | **Location** | [`APK_DOWNLOAD/app-debug.apk`](./APK_DOWNLOAD/app-debug.apk) |
-| **File Size** | ~23 MB (23,284,677 bytes) |
-| **SHA-256 Checksum** | `7c0e9619494574dae9ccbee51333747da368a3be329de52ee7928f8852577bfa` |
-| **MD5 Checksum** | `0d17ff7c2c17b6a710bc736a853f00b1` |
+| **File Size** | ~23.3 MB (23,317,445 bytes) |
+| **SHA-256 Checksum** | `60501b99d36bdaca94bcb753b5dc86b552c9942da11c05ea351e46fde3df6958` |
+| **MD5 Checksum** | `cf5990664b921d0a24c9d8892004083e` |
 | **Build Type** | Debug (Ready to install on Android 7.0+ / API 24–36) |
 | **Target Architecture** | ARM64 / ARMv7 / x86_64 |
 
@@ -20,7 +20,26 @@
 
 ## 🚀 What's New in This Build
 
-### 1. 🎵 "Make Video Music Exactly Same" (100% Identical Music)
+### 1. 🎵 Strict Audio Replacement & Source Mute Pipeline
+- **Complete Source Audio Removal**: When "Keep Original Voice" is OFF, the source video's original audio stream is completely removed and muted, rendering an MP4 that contains solely the user's selected music track.
+- **Zero Synthetic Audio Generations**: Removed synthetic fallback audio generators to guarantee the music track is preserved in its authentic, original characteristics without pitch shifting, speed alteration, or AI modification.
+- **Fail-Safe Music Validation**: Blocks exporting without a valid audio track or file selected.
+
+### 2. 🎚️ User-Controlled Voice Mixing & Dual Volume
+- **"Keep Original Audio / Voice" Option**: Easily mix the original speech/dialogue with the chosen music.
+- **Dual Volume Sliders**: Independent volume controls for Original Voice (0%–200%) and Music Volume (0%–200%).
+
+### 3. 🔁 Optional Audio Looping
+- **"Loop Music If Shorter Than Video" Toggle**: Toggle between repeating the music track if shorter than the video or playing it once without looping.
+
+### 4. 📋 Pre-Export Configuration & Audio Verification
+- **Validation Cards**: Pre-export summary cards on both the input view and fullscreen preview confirming:
+  - Music source name & track
+  - Original audio status (ON with volume % or OFF / removed)
+  - Looping behavior (ON / OFF)
+- **Post-Render Stream Verification**: Automatically verifies the exported MP4 contains an active AAC audio stream and displays verification status upon completion.
+
+### 5. 🎵 "Make Video Music Exactly Same" (100% Identical Music)
 - **One-Tap Exact Same Action Card**: Added a dedicated card in Section 2 with an instant **"Make Video Music Exactly Same"** button. Tapping it immediately activates the video's original soundtrack and sets the music duration to match the video 1:1.
 - **Lossless Direct Stream Copy**: For source videos with an audio track, the engine executes a direct stream copy via `MediaExtractor` and `MediaMuxer`. Audio packets are passed through byte-for-byte with zero transcoding, zero re-compression, zero pitch shift, and zero quality loss.
 - **Guaranteed Duration Alignment**: The music timeline matches the video duration down to the millisecond (`05:32` video = `05:32` music).

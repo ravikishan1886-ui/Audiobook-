@@ -40,6 +40,7 @@ fun AudiobookDashboard(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val remixState by viewModel.remixState.collectAsStateWithLifecycle()
+    val automationState by viewModel.automationState.collectAsStateWithLifecycle()
     val playerState by viewModel.playerManager.playerState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -108,7 +109,11 @@ fun AudiobookDashboard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (selectedTab == 0) Icons.Filled.Movie else Icons.Filled.Audiotrack,
+                                    imageVector = when (selectedTab) {
+                                        0 -> Icons.Filled.AutoMode
+                                        1 -> Icons.Filled.Movie
+                                        else -> Icons.Filled.Audiotrack
+                                    },
                                     contentDescription = "Logo",
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(20.dp)
@@ -116,13 +121,21 @@ fun AudiobookDashboard(
                             }
                             Column {
                                 Text(
-                                    text = if (selectedTab == 0) "Video & Music Remixer" else "AI Audiobook Studio",
+                                    text = when (selectedTab) {
+                                        0 -> "AI YouTube Video Automation"
+                                        1 -> "Video & Music Remixer"
+                                        else -> "AI Audiobook Studio"
+                                    },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (selectedTab == 0) "Hardware Muxer • Zero Narration" else "Gemini AI & cvoice.ai Engine",
+                                    text = when (selectedTab) {
+                                        0 -> "Google Sheets Queue • Music Library • YouTube API v3"
+                                        1 -> "Uploaded Music Exact Sync • Anime/Donghua Shorts"
+                                        else -> "Gemini AI & cvoice.ai Engine"
+                                    },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -163,13 +176,13 @@ fun AudiobookDashboard(
                         text = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Video Remixer", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
+                                Icon(Icons.Filled.AutoMode, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text("Automation", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
                             }
                         },
-                        modifier = Modifier.testTag("tab_remixer")
+                        modifier = Modifier.testTag("tab_automation")
                     )
                     Tab(
                         selected = selectedTab == 1,
@@ -177,10 +190,24 @@ fun AudiobookDashboard(
                         text = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("AI Audiobook", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                                Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text("Remixer", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        },
+                        modifier = Modifier.testTag("tab_remixer")
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text("Audiobook", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal)
                             }
                         },
                         modifier = Modifier.testTag("tab_audiobook")
@@ -190,6 +217,36 @@ fun AudiobookDashboard(
         }
     ) { innerPadding ->
         if (selectedTab == 0) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AutomationDashboardSection(
+                    automationState = automationState,
+                    youTubeConnected = uiState.youTubeState.isConnected || uiState.customYouTubeToken.isNotBlank(),
+                    youTubeChannelName = uiState.youTubeState.userName.ifBlank { "Connected" },
+                    onConnectGoogleSheets = { sheetId, sheetTab, token ->
+                        viewModel.connectGoogleSheets(sheetId, sheetTab, token)
+                    },
+                    onConnectYouTube = { viewModel.openYouTubeAuthDialog(true) },
+                    onUploadMusicFiles = { uris -> viewModel.uploadMusicFilesToLibrary(uris) },
+                    onSelectDefaultMusic = { id -> viewModel.selectDefaultMusicTrack(id) },
+                    onRefreshSheet = { viewModel.refreshGoogleSheet() },
+                    onStartAutomation = { viewModel.startQueueAutomation() },
+                    onPauseQueue = { viewModel.pauseQueueAutomation() },
+                    onStopAutomation = { viewModel.stopQueueAutomation() },
+                    onRetryFailedJobs = { viewModel.retryFailedAutomationJobs() },
+                    onAddRowToQueue = { row -> viewModel.addRowToAutomationQueue(row) },
+                    onUpdateSettings = { keepOrig, origVol, musVol, fadeIn, fadeOut, priv, desc ->
+                        viewModel.updateAutomationSettings(keepOrig, origVol, musVol, fadeIn, fadeOut, priv, desc)
+                    }
+                )
+            }
+        } else if (selectedTab == 1) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -212,6 +269,7 @@ fun AudiobookDashboard(
                     onOriginalVoiceVolumeChange = { viewModel.setOriginalVoiceVolume(it) },
                     onMusicVolumeChange = { viewModel.setMusicVolume(it) },
                     onLoopMusicChange = { viewModel.setLoopMusicIfShorter(it) },
+                    onDescriptionChange = { viewModel.updateRemixDescription(it) },
                     onRightsConfirmedChange = { viewModel.setRemixRightsConfirmed(it) },
                     onNextToPreview = { viewModel.openFullscreenPreview() },
                     onDirectRemixNow = { viewModel.startVideoProcessing() }

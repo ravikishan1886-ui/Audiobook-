@@ -1446,16 +1446,38 @@ app.post(
 // APK Download Handler
 const handleApkDownload = (_req, res) => {
   if (fs.existsSync(APK_FILE)) {
+    const stat = fs.statSync(APK_FILE);
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', 'attachment; filename="LicensedMusicRemix.apk"');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', 'attachment; filename="app-debug.apk"');
+    res.setHeader('Cache-Control', 'no-cache');
     return res.sendFile(APK_FILE);
   }
   return res.status(404).json({ error: 'APK file not found on server' });
 };
 
+app.get('/api/apk-info', (_req, res) => {
+  if (fs.existsSync(APK_FILE)) {
+    const stat = fs.statSync(APK_FILE);
+    return res.json({
+      available: true,
+      filename: 'app-debug.apk',
+      sizeBytes: stat.size,
+      sizeFormatted: `${(stat.size / (1024 * 1024)).toFixed(2)} MB`,
+      updatedAt: stat.mtime.toISOString(),
+      sha256: '4eb7afed08ea85d3f8db802f74beabe0d6f631a349ad305ac190b66db8e7ea4c',
+      downloadUrl: '/api/download-apk',
+      directUrl: '/APK_DOWNLOAD/app-debug.apk'
+    });
+  }
+  return res.status(404).json({ available: false });
+});
+
 app.get('/download-apk', handleApkDownload);
 app.get('/api/download-apk', handleApkDownload);
 app.get('/app-debug.apk', handleApkDownload);
+app.get('/APK_DOWNLOAD/app-debug.apk', handleApkDownload);
+app.use('/APK_DOWNLOAD', express.static(APK_DIR));
 app.use('/download', express.static(APK_DIR));
 
 // Serve frontend static build

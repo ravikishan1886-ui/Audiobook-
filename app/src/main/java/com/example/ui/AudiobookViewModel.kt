@@ -16,6 +16,7 @@ import com.example.audio.LocalAudioSynthesizer
 import com.example.data.api.CVoiceApiException
 import com.example.data.api.CVoiceClient
 import com.example.data.api.GeminiClient
+import com.example.data.api.GoogleSheetsClient
 import com.example.data.api.YouTubeUploader
 import com.example.data.model.AudioEngineType
 import com.example.data.model.Chapter
@@ -79,6 +80,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
     private val geminiClient = GeminiClient()
     private val cvoiceClient = CVoiceClient(context)
     private val youTubeUploader = YouTubeUploader(context)
+    private val googleSheetsClient = GoogleSheetsClient()
     private val localSynthesizer = LocalAudioSynthesizer(context)
     val playerManager = AudioPlayerManager(context)
 
@@ -87,6 +89,11 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _remixState = MutableStateFlow(VideoMusicRemixState())
     val remixState: StateFlow<VideoMusicRemixState> = _remixState.asStateFlow()
+
+    private val _automationState = MutableStateFlow(AutomationDashboardState())
+    val automationState: StateFlow<AutomationDashboardState> = _automationState.asStateFlow()
+
+    private var automationJob: kotlinx.coroutines.Job? = null
 
     init {
         // Load initial sample book
@@ -1502,6 +1509,450 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setRemixPrivacy(privacy: YouTubePrivacy) {
         _remixState.update { it.copy(privacyStatus = privacy) }
+    }
+
+    fun updateRemixDescription(description: String) {
+        _remixState.update { it.copy(videoDescription = description) }
+    }
+
+    // ==========================================
+    // YouTube & Google Sheets Automation Methods
+    // ==========================================
+
+    fun connectGoogleSheets(spreadsheetInput: String, sheetName: String, accessToken: String) {
+        val cleanId = googleSheetsClient.extractSpreadsheetId(spreadsheetInput)
+        _automationState.update {
+            it.copy(
+                spreadsheetId = cleanId,
+                sheetName = sheetName.ifBlank { "Sheet1" },
+                googleAccessToken = accessToken.trim(),
+                isSheetsConnected = cleanId.isNotBlank(),
+                sheetError = null
+            )
+        }
+        if (accessToken.isNotBlank()) {
+            youTubeUploader.setAccessToken(accessToken.trim())
+            _uiState.update { it.copy(customYouTubeToken = accessToken.trim()) }
+        }
+        if (cleanId.isNotBlank()) {
+            refreshGoogleSheet()
+        }
+    }
+
+    fun refreshGoogleSheet() {
+        val state = _automationState.value
+        if (state.spreadsheetId.isBlank()) {
+            _uiState.update {
+                it.copy(notificationMessage = "Queue refreshed (${state.queueRows.size} rows in local queue)")
+            }
+            return
+        }
+        viewModelScope.launch {
+            _automationState.update { it.copy(isFetchingSheet = true, sheetError = null) }
+            val result = googleSheetsClient.fetchRows(
+                spreadsheetId = state.spreadsheetId,
+                sheetName = state.sheetName,
+                accessToken = state.googleAccessToken.ifBlank { _uiState.value.customYouTubeToken }
+            )
+            result.onSuccess { rows ->
+                _automationState.update {
+                    it.copy(
+                        isFetchingSheet = false,
+                        isSheetsConnected = true,
+                        queueRows = rows,
+                        sheetError = null,
+                        currentStepLabel = "Fetched ${rows.size} rows from Google Sheet (${rows.count { r -> r.uploadStatus == SheetJobStatus.READY }} READY)"
+                    )
+                }
+                _uiState.update {
+                    it.copy(notificationMessage = "Loaded ${rows.size} rows from Google Sheets!")
+                }
+            }.onFailure { err ->
+                _automationState.update {
+                    it.copy(
+                        isFetchingSheet = false,
+                        sheetError = err.message ?: "Could not fetch Google Sheet"
+                    )
+                }
+            }
+        }
+    }
+
+    fun uploadMusicFilesToLibrary(uris: List<Uri>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val newTracks = mutableListOf<UploadedMusicTrack>()
+            for (uri in uris) {
+                val rawName = uri.lastPathSegment?.substringAfterLast("/") ?: "Uploaded_Track_${System.currentTimeMillis()}.mp3"
+                val ext = rawName.substringAfterLast(".", "MP3").uppercase()
+                var durMs = 180000L
+                try {
+                    val mmr = MediaMetadataRetriever()
+                    mmr.setDataSource(context, uri)
+                    durMs = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 180000L
+                    mmr.release()
+                } catch (_: Exception) {}
+
+                val track = UploadedMusicTrack(
+                    id = "track_${UUID.randomUUID().toString().take(8)}",
+                    name = rawName,
+                    durationMs = durMs,
+                    formattedDuration = VideoMusicRemixState.formatDuration(durMs),
+                    format = ext,
+                    uploadStatus = "UPLOADED",
+                    fileUri = uri,
+                    isDefault = false
+                )
+                newTracks.add(track)
+            }
+            if (newTracks.isNotEmpty()) {
+                val first = newTracks.first()
+                _automationState.update { current ->
+                    val updatedList = current.musicLibrary + newTracks
+                    current.copy(
+                        musicLibrary = updatedList,
+                        defaultMusicTrackId = first.id
+                    )
+                }
+                // Also sync with single video remixer
+                selectRemixMusic(first.fileUri!!, first.name)
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(notificationMessage = "Uploaded ${newTracks.size} music track(s) to Music Library")
+                    }
+                }
+            }
+        }
+    }
+
+    fun selectDefaultMusicTrack(trackId: String) {
+        _automationState.update { current ->
+            val updated = current.musicLibrary.map { it.copy(isDefault = it.id == trackId) }
+            current.copy(
+                defaultMusicTrackId = trackId,
+                musicLibrary = updated
+            )
+        }
+    }
+
+    fun addRowToAutomationQueue(row: SheetVideoRow) {
+        _automationState.update { current ->
+            current.copy(queueRows = current.queueRows + row)
+        }
+        val state = _automationState.value
+        val token = state.googleAccessToken.ifBlank { _uiState.value.customYouTubeToken }
+        if (state.spreadsheetId.isNotBlank() && token.isNotBlank()) {
+            viewModelScope.launch {
+                googleSheetsClient.appendRow(
+                    spreadsheetId = state.spreadsheetId,
+                    sheetName = state.sheetName,
+                    row = row,
+                    accessToken = token
+                )
+            }
+        }
+    }
+
+    fun updateAutomationSettings(
+        keepOriginalAudio: Boolean,
+        originalVol: Float,
+        musicVol: Float,
+        fadeIn: Float,
+        fadeOut: Float,
+        privacy: YouTubePrivacy,
+        defaultDesc: String
+    ) {
+        _automationState.update {
+            it.copy(
+                keepOriginalAudio = keepOriginalAudio,
+                originalAudioVolume = originalVol,
+                defaultMusicVolume = musicVol,
+                fadeInSeconds = fadeIn,
+                fadeOutSeconds = fadeOut,
+                defaultPrivacy = privacy,
+                defaultDescription = defaultDesc.ifBlank { DEFAULT_REMIX_VIDEO_DESCRIPTION }
+            )
+        }
+        _remixState.update {
+            it.copy(
+                keepOriginalVoice = keepOriginalAudio,
+                originalVoiceVolume = originalVol,
+                musicVolume = musicVol,
+                privacyStatus = privacy,
+                videoDescription = defaultDesc.ifBlank { DEFAULT_REMIX_VIDEO_DESCRIPTION }
+            )
+        }
+    }
+
+    fun startQueueAutomation() {
+        if (_automationState.value.queueStatus == QueueRunStatus.RUNNING) return
+        _automationState.update {
+            it.copy(
+                queueStatus = QueueRunStatus.RUNNING,
+                currentStepLabel = "Starting automation worker..."
+            )
+        }
+
+        automationJob = viewModelScope.launch {
+            while (_automationState.value.queueStatus == QueueRunStatus.RUNNING) {
+                val nextRow = _automationState.value.queueRows.firstOrNull { it.uploadStatus == SheetJobStatus.READY }
+                if (nextRow == null) {
+                    _automationState.update {
+                        it.copy(
+                            queueStatus = QueueRunStatus.IDLE,
+                            currentProcessingRowNumber = null,
+                            currentProcessingTitle = null,
+                            currentStepLabel = "All READY rows finished processing!"
+                        )
+                    }
+                    break
+                }
+
+                processSingleQueueRow(nextRow)
+            }
+        }
+    }
+
+    fun pauseQueueAutomation() {
+        _automationState.update {
+            it.copy(
+                queueStatus = QueueRunStatus.PAUSED,
+                currentStepLabel = "Queue paused — will pause after current step"
+            )
+        }
+        automationJob?.cancel()
+    }
+
+    fun stopQueueAutomation() {
+        automationJob?.cancel()
+        _automationState.update { current ->
+            val resetRows = current.queueRows.map { row ->
+                if (row.uploadStatus == SheetJobStatus.PROCESSING) row.copy(uploadStatus = SheetJobStatus.READY)
+                else row
+            }
+            current.copy(
+                queueStatus = QueueRunStatus.STOPPED,
+                queueRows = resetRows,
+                currentProcessingRowNumber = null,
+                currentProcessingTitle = null,
+                videoProcessingProgress = 0f,
+                youtubeUploadProgress = 0f,
+                currentStepLabel = "Automation stopped by user."
+            )
+        }
+    }
+
+    fun retryFailedAutomationJobs() {
+        _automationState.update { current ->
+            val updated = current.queueRows.map { row ->
+                if (row.uploadStatus == SheetJobStatus.FAILED) {
+                    row.copy(uploadStatus = SheetJobStatus.READY, errorMessage = "")
+                } else row
+            }
+            current.copy(
+                queueRows = updated,
+                currentStepLabel = "Reset failed jobs to READY"
+            )
+        }
+        startQueueAutomation()
+    }
+
+    private suspend fun processSingleQueueRow(row: SheetVideoRow) {
+        val stateSnap = _automationState.value
+        val token = stateSnap.googleAccessToken.ifBlank { _uiState.value.customYouTubeToken }
+
+        // Mark row PROCESSING
+        updateRowInQueue(row.rowNumber, SheetJobStatus.PROCESSING, "", "")
+        if (stateSnap.spreadsheetId.isNotBlank() && token.isNotBlank()) {
+            googleSheetsClient.updateRowStatus(
+                spreadsheetId = stateSnap.spreadsheetId,
+                sheetName = stateSnap.sheetName,
+                rowNumber = row.rowNumber,
+                status = SheetJobStatus.PROCESSING,
+                accessToken = token
+            )
+        }
+
+        _automationState.update {
+            it.copy(
+                currentProcessingRowNumber = row.rowNumber,
+                currentProcessingTitle = row.videoTitle,
+                videoProcessingProgress = 0.05f,
+                youtubeUploadProgress = 0f,
+                currentStepLabel = "Downloading source video for Row #${row.rowNumber}..."
+            )
+        }
+
+        try {
+            val videoDownload = VideoMusicRemixerEngine.downloadVideo(
+                context = context,
+                videoUrl = row.videoUrl,
+                onProgress = { p, msg ->
+                    _automationState.update {
+                        it.copy(
+                            videoProcessingProgress = (0.05f + p * 0.30f).coerceIn(0f, 1f),
+                            currentStepLabel = msg
+                        )
+                    }
+                }
+            )
+            val videoFile = videoDownload.getOrThrow()
+
+            // Resolve music track from library
+            val defaultTrack = _automationState.value.musicLibrary.firstOrNull {
+                it.id == _automationState.value.defaultMusicTrackId
+            } ?: _automationState.value.musicLibrary.firstOrNull()
+
+            val matchedTrack = _automationState.value.musicLibrary.firstOrNull {
+                row.musicSelection.isNotBlank() && it.name.contains(row.musicSelection, ignoreCase = true)
+            } ?: defaultTrack
+
+            val musicFileResult = VideoMusicRemixerEngine.prepareMusicFile(
+                context = context,
+                musicUri = matchedTrack?.fileUri,
+                sampleTitle = matchedTrack?.name ?: row.musicSelection.ifBlank { "Cyberpunk Anime Fight Beat" },
+                sampleDurationMs = matchedTrack?.durationMs ?: 180000L,
+                onProgress = { p, msg ->
+                    _automationState.update {
+                        it.copy(
+                            videoProcessingProgress = (0.35f + p * 0.15f).coerceIn(0f, 1f),
+                            currentStepLabel = msg
+                        )
+                    }
+                }
+            )
+            val musicFile = musicFileResult.getOrThrow()
+
+            val (videoDurMs, _) = VideoMusicRemixerEngine.analyzeVideoAndAudio(videoFile, musicFile)
+                .getOrDefault(Pair(30000L, 30000L))
+
+            val mixResult = VideoMusicRemixerEngine.mixAndAdjustMusic(
+                context = context,
+                musicFile = musicFile,
+                targetDurationMs = videoDurMs,
+                sourceVideoFile = videoFile,
+                keepOriginalVoice = _automationState.value.keepOriginalAudio,
+                originalVoiceVolume = _automationState.value.originalAudioVolume,
+                musicVolume = row.musicVolume,
+                loopMusicIfShorter = true,
+                onProgress = { p, msg ->
+                    _automationState.update {
+                        it.copy(
+                            videoProcessingProgress = (0.50f + p * 0.25f).coerceIn(0f, 1f),
+                            currentStepLabel = msg
+                        )
+                    }
+                }
+            )
+            val mixedWav = mixResult.getOrThrow()
+
+            val renderResult = VideoMusicRemixerEngine.renderFinalVideo(
+                context = context,
+                videoFile = videoFile,
+                matchedAudioWav = mixedWav,
+                targetDurationMs = videoDurMs,
+                onProgress = { p, msg ->
+                    _automationState.update {
+                        it.copy(
+                            videoProcessingProgress = (0.75f + p * 0.25f).coerceIn(0f, 1f),
+                            currentStepLabel = msg
+                        )
+                    }
+                }
+            )
+            val finalMp4 = renderResult.getOrThrow()
+
+            _automationState.update {
+                it.copy(
+                    videoProcessingProgress = 1.0f,
+                    youtubeUploadProgress = 0.1f,
+                    currentStepLabel = "Uploading '${row.videoTitle}' to YouTube..."
+                )
+            }
+
+            if (token.isNotBlank()) {
+                youTubeUploader.setAccessToken(token)
+            }
+
+            val finalDesc = row.videoDescription.ifBlank { _automationState.value.defaultDescription }
+            val ytUploadResult = VideoMusicRemixerEngine.uploadToYouTube(
+                videoFile = finalMp4,
+                title = row.videoTitle,
+                description = finalDesc,
+                privacy = _automationState.value.defaultPrivacy,
+                uploader = youTubeUploader,
+                onProgress = { p, msg ->
+                    _automationState.update {
+                        it.copy(
+                            youtubeUploadProgress = p.coerceIn(0.1f, 0.99f),
+                            currentStepLabel = msg
+                        )
+                    }
+                }
+            )
+
+            val (_, ytUrl) = ytUploadResult.getOrThrow()
+
+            updateRowInQueue(row.rowNumber, SheetJobStatus.UPLOADED, ytUrl, "")
+            if (stateSnap.spreadsheetId.isNotBlank() && token.isNotBlank()) {
+                googleSheetsClient.updateRowStatus(
+                    spreadsheetId = stateSnap.spreadsheetId,
+                    sheetName = stateSnap.sheetName,
+                    rowNumber = row.rowNumber,
+                    status = SheetJobStatus.UPLOADED,
+                    youtubeUrl = ytUrl,
+                    errorMessage = "",
+                    accessToken = token
+                )
+            }
+
+            _automationState.update {
+                it.copy(
+                    youtubeUploadProgress = 1.0f,
+                    latestSuccessfulUploadTitle = row.videoTitle,
+                    latestSuccessfulUploadUrl = ytUrl,
+                    currentStepLabel = "Uploaded Row #${row.rowNumber} → $ytUrl"
+                )
+            }
+        } catch (e: Exception) {
+            val errMsg = e.message ?: "Processing or upload failed"
+            updateRowInQueue(row.rowNumber, SheetJobStatus.FAILED, "", errMsg)
+            if (stateSnap.spreadsheetId.isNotBlank() && token.isNotBlank()) {
+                googleSheetsClient.updateRowStatus(
+                    spreadsheetId = stateSnap.spreadsheetId,
+                    sheetName = stateSnap.sheetName,
+                    rowNumber = row.rowNumber,
+                    status = SheetJobStatus.FAILED,
+                    youtubeUrl = "",
+                    errorMessage = errMsg,
+                    accessToken = token
+                )
+            }
+            _automationState.update {
+                it.copy(
+                    currentStepLabel = "Row #${row.rowNumber} FAILED: $errMsg"
+                )
+            }
+        }
+    }
+
+    private fun updateRowInQueue(
+        rowNumber: Int,
+        status: SheetJobStatus,
+        youtubeUrl: String,
+        errorMessage: String
+    ) {
+        _automationState.update { current ->
+            val updated = current.queueRows.map { r ->
+                if (r.rowNumber == rowNumber) {
+                    r.copy(
+                        uploadStatus = status,
+                        youtubeVideoUrl = if (youtubeUrl.isNotBlank()) youtubeUrl else r.youtubeVideoUrl,
+                        errorMessage = errorMessage
+                    )
+                } else r
+            }
+            current.copy(queueRows = updated)
+        }
     }
 
     fun openFullscreenPreview() {

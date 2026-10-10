@@ -376,13 +376,13 @@ fun VideoRemixInputSection(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "2. Upload Music or YouTube Music URL",
+                        text = "2. Upload Music",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Surface(
-                        color = Color(0xFFFF0000).copy(alpha = 0.12f),
+                        color = Color(0xFF2E7D32).copy(alpha = 0.12f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -391,16 +391,16 @@ fun VideoRemixInputSection(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                Icons.Filled.PlayCircle,
+                                Icons.Filled.CheckCircle,
                                 contentDescription = null,
-                                tint = Color(0xFFFF0000),
+                                tint = Color(0xFF2E7D32),
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "YouTube Music Supported",
+                                text = "Exact Same Duration Synced",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFF0000)
+                                color = Color(0xFF2E7D32)
                             )
                         }
                     }

@@ -4,6 +4,15 @@ import android.net.Uri
 import java.io.File
 import java.util.Locale
 
+const val DEFAULT_REMIX_VIDEO_DESCRIPTION = """🔥 Anime lovers, this moment was INSANE! ⚡
+Watch till the end and tell me your favorite scene! 👀🔥
+
+🎬 Anime/Donghua Shorts | Hindi/Urdu Explanation
+💬 Comment your thoughts below!
+❤️ Like • 🔔 Subscribe • Share
+
+#anime #animeedit #animeshorts #donghua #donghuashorts #animeclips #shorts #viralshorts #hindianime #animefans"""
+
 enum class RemixViewMode {
     INPUT,
     PREVIEW,
@@ -68,14 +77,14 @@ data class VideoMusicRemixState(
     val downloadedVideoFile: File? = null,
     val renderedMp4File: File? = null,
 
-    // Durations in milliseconds
+    // Durations in milliseconds - Uploaded music is made exact same duration as video
     val originalDurationMs: Long = 332000L, // Default 05:32 demo
-    val musicDurationMs: Long = 195000L,    // Default 03:15 demo
+    val musicDurationMs: Long = 332000L,    // Exact same duration as video
     val finalDurationMs: Long = 332000L,    // Matched to original duration: 05:32
 
     val hasRightsPermission: Boolean = true,
-    val videoTitle: String = "Remixed Video with Soundtrack",
-    val videoDescription: String = "Video remixed with custom background music overlay and duration alignment.",
+    val videoTitle: String = "Anime/Donghua Shorts Remix",
+    val videoDescription: String = DEFAULT_REMIX_VIDEO_DESCRIPTION,
     val privacyStatus: YouTubePrivacy = YouTubePrivacy.PRIVATE,
     val sourceBadge: String = "",
     val detectedFileName: String? = null,
@@ -103,11 +112,11 @@ data class VideoMusicRemixState(
     val verifiedAudioSource: String? = null
 ) {
     val hasSelectedMusic: Boolean
-        get() = musicFileUri != null || youtubeMusicUrl.isNotBlank() || (musicFileName.isNotBlank() && !musicFileName.contains("Keep Same Music", ignoreCase = true))
+        get() = musicFileUri != null || (musicFileName.isNotBlank() && !musicFileName.contains("Keep Same Music", ignoreCase = true))
 
-    // Kept for backward compatibility if referenced anywhere
+    // Uploaded music is always synchronized to the exact same duration as the video
     val isExactSameMusic: Boolean
-        get() = false
+        get() = true
 
     val isPreserveOriginalAudio: Boolean
         get() = keepOriginalVoice

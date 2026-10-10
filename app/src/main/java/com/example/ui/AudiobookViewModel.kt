@@ -1288,11 +1288,11 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                 mmr.release()
             } catch (e: Exception) {}
 
-            _remixState.update {
-                it.copy(
+            _remixState.update { current ->
+                current.copy(
                     musicFileUri = uri,
                     musicFileName = fileName,
-                    musicDurationMs = if (extractedDuration > 0) extractedDuration else 180000L,
+                    musicDurationMs = current.finalDurationMs,
                     localMusicFile = null,
                     youtubeMusicUrl = "",
                     youtubeMusicTitle = null,
@@ -1301,7 +1301,7 @@ class AudiobookViewModel(application: Application) : AndroidViewModel(applicatio
                     resolvedYouTubeSource = null,
                     errorMessage = null,
                     youtubeMusicError = null,
-                    statusMessage = "Audio file selected: $fileName"
+                    statusMessage = "Uploaded audio selected: $fileName (Duration matched to video)"
                 )
             }
         }
